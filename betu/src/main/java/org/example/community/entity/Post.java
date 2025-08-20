@@ -17,13 +17,16 @@ public class Post {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long postId;
 
-    @ManyToOne
-    @JoinColumn(name = "crew_Id")
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "crew_Id", nullable = true)
     private Crew crew;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)   // 작성자 필수
     private User user;
+
+    @Lob
+    private String postTitle;
 
     @Lob
     private String postContent;

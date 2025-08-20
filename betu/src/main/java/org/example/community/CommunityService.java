@@ -39,20 +39,24 @@ public class CommunityService {
 
     // 게시글 작성
     @Transactional
-    public Long createPost(Long userId, PostCreateRequest req) throws IOException {
+    public Long createPost(Long userId, PostCreateRequest req, List<MultipartFile> images) throws IOException {
         User author = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
-        Crew crew = crewRepository.findById(req.getCrewId())
-                .orElseThrow(() -> new EntityNotFoundException("그룹 없음"));
+        Crew crew = null;
+        if (req.getCrewId() != null) {
+            crew = crewRepository.findById(req.getCrewId())
+                    .orElseThrow(() -> new EntityNotFoundException("그룹 없음"));
+        }
 
-        Post post = new Post(null, crew, author, req.getContent(), 0);
+        Post post = new Post(null, crew, author, req.getTitle(), req.getContent(), 0);
         Post saved = postRepository.save(post);
 
         // 이미지 업로드
-        if (req.getImages() != null && !req.getImages().isEmpty()) {
+        if (images != null && !images.isEmpty()) {
             int order = 0;
-            for (MultipartFile file : req.getImages()) {
-                String prefix = String.format("crew/%d/post/%d", crew.getCrewId(), saved.getPostId());
+            for (MultipartFile file : images) {
+                Long crewIdValue = (crew != null) ? crew.getCrewId() : 0L;
+                String prefix = String.format("crew/%d/post/%d", crewIdValue, saved.getPostId());
                 String url = s3Uploader.uploadImageUnderPrefix(file, prefix);
 
                 PostImage pi = PostImage.builder()
@@ -77,7 +81,7 @@ public class CommunityService {
             throw new SecurityException("수정 권한이 없습니다.");
         }
 
-        Post updated = new Post(post.getPostId(), post.getCrew(), post.getUser(), req.getContent(), 0);
+        Post updated = new Post(post.getPostId(), post.getCrew(), post.getUser(), req.getTitle(), req.getContent(), 0);
         postRepository.save(updated);
     }
 
@@ -98,25 +102,37 @@ public class CommunityService {
 
     // ===== 크루별 게시글 목록 (페이지네이션) =====
     @Transactional(readOnly = true)
-    public Page<PostSummaryResponse> getPostsByCrew(Long crewId, Pageable pageable) {
-        Page<Post> page = postRepository.findByCrew_CrewIdOrderByPostIdDesc(crewId, pageable);
-        return page.map(p -> {
-            List<PostImage> images = postImageRepository.findByPost_PostIdOrderBySortOrderAsc(p.getPostId());
-            String thumbnail = images.isEmpty() ? null : images.get(0).getImageUrl();
+    public List<PostSummaryResponse> getPostsByCrew(Long crewId) {
+        List<Post> posts;
 
-            int commentCount = (int) commentRepository.findByPost_PostId(p.getPostId()).size();
+        if (crewId == null) {
+            // crewId 없으면 crew == null인 게시글 전체 조회
+            posts = postRepository.findByCrewIsNullOrderByPostIdDesc();
+        } else {
+            // crewId 있으면 해당 crew 게시글 전체 조회
+            posts = postRepository.findByCrew_CrewIdOrderByPostIdDesc(crewId);
+        }
 
-            return new PostSummaryResponse(
-                    p.getPostId(),
-                    p.getCrew() != null ? p.getCrew().getCrewId() : null,
-                    p.getUser().getUserId(),
-                    p.getUser().getUserName(),
-                    preview(p.getPostContent(), 120),
-                    p.getPostLikeCnt(),
-                    commentCount,
-                    thumbnail
-            );
-        });
+        return posts.stream()
+                .map(p -> {
+                    List<PostImage> images = postImageRepository.findByPost_PostIdOrderBySortOrderAsc(p.getPostId());
+                    String thumbnail = images.isEmpty() ? null : images.get(0).getImageUrl();
+
+                    int commentCount = commentRepository.findByPost_PostId(p.getPostId()).size();
+
+                    return new PostSummaryResponse(
+                            p.getPostId(),
+                            p.getCrew() != null ? p.getCrew().getCrewId() : null,
+                            p.getUser().getUserId(),
+                            p.getUser().getUserName(),
+                            p.getPostTitle(),
+                            preview(p.getPostContent(), 120),
+                            p.getPostLikeCnt(),
+                            commentCount,
+                            thumbnail
+                    );
+                })
+                .toList();
     }
 
     private String preview(String content, int max) {
@@ -148,6 +164,7 @@ public class CommunityService {
                 post.getCrew() != null ? post.getCrew().getCrewId() : null,
                 post.getUser().getUserId(),
                 post.getUser().getUserName(), // 필요 시 변경
+                post.getPostTitle(),
                 post.getPostContent(),
                 post.getPostLikeCnt(),
                 imageUrls,

@@ -12,7 +12,6 @@ import java.util.List;
 @Data
 public class PostCreateRequest {
     private Long crewId;
+    private String title;
     private String content;
-    // 다중 이미지 업로드
-    private List<MultipartFile> images;
 }
