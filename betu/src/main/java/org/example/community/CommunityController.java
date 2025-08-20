@@ -3,6 +3,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.community.dto.*;
 import org.example.user.UserService;
 import org.springframework.data.domain.Page;
@@ -16,6 +17,7 @@ import java.io.IOException;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/community")
+@Slf4j
 public class CommunityController {
 
     private final CommunityService communityService;
@@ -29,6 +31,8 @@ public class CommunityController {
             @Valid @ModelAttribute PostCreateRequest req
     ) throws IOException {
         Long userId = userService.getUserIdFromToken(request);
+        log.info(">>> createPost called by userId: {}", userId);
+        log.info(">>> PostCreateRequest: {}, {}", req.getCrewId(), req.getContent());
         return ResponseEntity.ok(communityService.createPost(userId, req));
     }
 
