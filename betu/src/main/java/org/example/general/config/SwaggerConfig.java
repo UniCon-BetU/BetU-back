@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @OpenAPIDefinition(
         servers = {
+                @Server(url = "https://54.180.150.39.nip.io", description = "Production Server"),
                 @Server(url = "http://localhost:8080", description = "Local Serever")
         }
 )
