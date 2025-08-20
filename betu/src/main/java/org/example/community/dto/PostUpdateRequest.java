@@ -7,5 +7,6 @@ import java.util.Map;
 
 @Getter
 public class PostUpdateRequest {
+    private String title;
     private String content;                 // 본문 수정
 }

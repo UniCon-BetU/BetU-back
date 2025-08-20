@@ -10,6 +10,7 @@ public class PostSummaryResponse {
     private Long crewId;
     private Long authorId;
     private String authorName;     // 필요 없으면 제거
+    private String title;
     private String preview;        // 앞부분만 잘라서
     private Integer likeCount;
     private Integer commentCount;
