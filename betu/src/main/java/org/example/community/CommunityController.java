@@ -6,13 +6,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.community.dto.*;
 import org.example.user.UserService;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -28,12 +33,18 @@ public class CommunityController {
     @Operation(summary = "게시글 작성")
     public ResponseEntity<Long> createPost(
             HttpServletRequest request,
-            @Valid @ModelAttribute PostCreateRequest req
+            @ParameterObject @ModelAttribute PostCreateRequest req,
+            @RequestPart(name = "images", required = false) List<MultipartFile> images // 파일 (없으면 null)
     ) throws IOException {
         Long userId = userService.getUserIdFromToken(request);
+
         log.info(">>> createPost called by userId: {}", userId);
-        log.info(">>> PostCreateRequest: {}, {}", req.getCrewId(), req.getContent());
-        return ResponseEntity.ok(communityService.createPost(userId, req));
+        log.info(">>> PostCreateRequest: crewId={}, title={}, content={}",
+                req.getCrewId(), req.getTitle(), req.getContent());
+        log.info(">>> images: {}", (images == null ? "null" : images.size()));
+
+        Long postId = communityService.createPost(userId, req, images);
+        return ResponseEntity.ok(postId);
     }
 
     // 게시글 수정 (본문만 — 서비스에 이미지 수정은 추후 예정이라고 주석 있음)
@@ -83,13 +94,12 @@ public class CommunityController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/crews/{crewId}/posts")
+    @GetMapping("/crews/posts")
     @Operation(summary = "크루별 게시글 목록 (페이지네이션)")
-    public ResponseEntity<Page<PostSummaryResponse>> getPostsByCrew(
-            @PathVariable Long crewId,
-            Pageable pageable
+    public ResponseEntity<List<PostSummaryResponse>> getPostsByCrew(
+            @RequestParam(required = false) Long crewId
     ) {
-        return ResponseEntity.ok(communityService.getPostsByCrew(crewId, pageable));
+        return ResponseEntity.ok(communityService.getPostsByCrew(crewId));
     }
 
     @GetMapping("/posts/{postId}")
