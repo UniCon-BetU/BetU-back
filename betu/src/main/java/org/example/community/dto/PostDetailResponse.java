@@ -17,6 +17,7 @@ public class PostDetailResponse {
     private Integer likeCount;
     private List<String> imageUrls;        // 정렬된 이미지 URL 목록
     private List<CommentItem> comments;    // 댓글 목록
+    private boolean liked;
 
     @Getter
     @AllArgsConstructor

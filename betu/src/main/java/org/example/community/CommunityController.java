@@ -94,8 +94,16 @@ public class CommunityController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/posts")
+    @Operation(summary = "전체 게시글 목록")
+    public ResponseEntity<List<PostSummaryResponse>> getAllPosts(
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.ok(communityService.getAllPosts());
+    }
+
     @GetMapping("/crews/posts")
-    @Operation(summary = "크루별 게시글 목록 (페이지네이션)")
+    @Operation(summary = "크루별 게시글 목록")
     public ResponseEntity<List<PostSummaryResponse>> getPostsByCrew(
             @RequestParam(required = false) Long crewId
     ) {
@@ -105,9 +113,11 @@ public class CommunityController {
     @GetMapping("/posts/{postId}")
     @Operation(summary = "게시글 상세 (이미지 + 댓글)")
     public ResponseEntity<PostDetailResponse> getPostDetail(
+            HttpServletRequest request,
             @PathVariable Long postId
     ) {
-        return ResponseEntity.ok(communityService.getPostDetail(postId));
+        Long userId = userService.getUserIdFromToken(request);
+        return ResponseEntity.ok(communityService.getPostDetail(userId, postId));
     }
 
     @PostMapping("/posts/{postId}/like")
