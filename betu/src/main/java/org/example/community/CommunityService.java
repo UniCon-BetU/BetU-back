@@ -100,7 +100,34 @@ public class CommunityService {
         postRepository.deleteById(postId);
     }
 
-    // ===== 크루별 게시글 목록 (페이지네이션) =====
+    // 전체 게시글 조회
+    @Transactional(readOnly = true)
+    public List<PostSummaryResponse> getAllPosts() {
+        List<Post> posts = postRepository.findAllByOrderByPostIdDesc();
+
+        return posts.stream()
+                .map(p -> {
+                    List<PostImage> images = postImageRepository.findByPost_PostIdOrderBySortOrderAsc(p.getPostId());
+                    String thumbnail = images.isEmpty() ? null : images.get(0).getImageUrl();
+
+                    int commentCount = commentRepository.findByPost_PostId(p.getPostId()).size();
+
+                    return new PostSummaryResponse(
+                            p.getPostId(),
+                            p.getCrew() != null ? p.getCrew().getCrewId() : null,
+                            p.getUser().getUserId(),
+                            p.getUser().getUserName(),
+                            p.getPostTitle(),
+                            preview(p.getPostContent(), 120),
+                            p.getPostLikeCnt(),
+                            commentCount,
+                            thumbnail
+                    );
+                })
+                .toList();
+    }
+
+    // 크루별 게시글 목록
     @Transactional(readOnly = true)
     public List<PostSummaryResponse> getPostsByCrew(Long crewId) {
         List<Post> posts;
@@ -142,7 +169,7 @@ public class CommunityService {
 
     // 게시글 상세 (이미지 + 댓글)
     @Transactional(readOnly = true)
-    public PostDetailResponse getPostDetail(Long postId) {
+    public PostDetailResponse getPostDetail(Long userId, Long postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new EntityNotFoundException("게시글이 없습니다."));
 
@@ -159,6 +186,8 @@ public class CommunityService {
                 ))
                 .toList();
 
+        boolean liked = postLikeRepository.existsByUserIdAndPostId(userId, postId);
+
         return new PostDetailResponse(
                 post.getPostId(),
                 post.getCrew() != null ? post.getCrew().getCrewId() : null,
@@ -168,7 +197,8 @@ public class CommunityService {
                 post.getPostContent(),
                 post.getPostLikeCnt(),
                 imageUrls,
-                commentItems
+                commentItems,
+                liked
         );
     }
 
@@ -184,7 +214,7 @@ public class CommunityService {
             post.decreaseLike();
         } else {
             var user = userRepository.getReferenceById(userId);
-            postLikeRepository.save(new PostLike(postId, userId));
+            postLikeRepository.save(new PostLike(userId, postId));
             post.increaseLike();
         }
 

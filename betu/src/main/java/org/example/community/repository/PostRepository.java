@@ -11,4 +11,5 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     List<Post> findByCrew_CrewIdOrderByPostIdDesc(Long crewId);
     List<Post> findByCrewIsNullOrderByPostIdDesc(); // crewId가 null인 경우
 
+    List<Post> findAllByOrderByPostIdDesc();
 }
