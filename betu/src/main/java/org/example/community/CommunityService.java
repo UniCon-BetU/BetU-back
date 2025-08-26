@@ -133,14 +133,11 @@ public class CommunityService {
     }
 
     @Transactional(readOnly = true)
-    public List<PostSummaryResponse> searchPostsLatest(String query) {
-        if (query == null || query.isBlank()) {
-            return List.of();
-        }
-        List<Post> posts = postRepository
-                .findByPostTitleContainingIgnoreCaseOrPostContentContainingIgnoreCaseOrderByPostIdDesc(query, query);
-
-        return toPostSummaryResponses(posts);
+    public List<PostSummaryResponse> searchPostsLatest(String query, Long crewId) {
+        if (query == null || query.isBlank()) return List.of();
+        return toPostSummaryResponses(
+                postRepository.searchLatestByKeyword(crewId, query.trim())
+        );
     }
 
     // 게시글 상세 (이미지 + 댓글)
