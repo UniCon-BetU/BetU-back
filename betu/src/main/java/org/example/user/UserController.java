@@ -1,5 +1,6 @@
 package org.example.user;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.example.user.dto.ChangePasswordRequestDto;
 import org.example.user.dto.UserLogInRequestDto;
 import org.example.user.dto.UserSignUpRequestDto;
@@ -59,6 +60,22 @@ public class UserController {
         return ResponseEntity.ok("비밀번호 변경 성공");
     }
 
+    @GetMapping("/{userId}/points")
+    @Operation(summary = "유저 포인트 확인")
+    public ResponseEntity<Long> getUserPoint(HttpServletRequest request) {
+        Long userId = userService.getUserIdFromToken(request);
+        long point = userService.getUserPoint(userId);
+        return ResponseEntity.ok(point);
+    }
 
+    @PostMapping("/{userId}/points/grant")
+    @Operation(summary = "(테스트/관리자) 유저에게 포인트 추가")
+    public ResponseEntity<Long> grantTestPoint(
+            HttpServletRequest request, @RequestParam long amount
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+        long point = userService.grantTestPoint(userId, amount);
+        return ResponseEntity.ok(point);
+    }
 }
 

@@ -1,5 +1,6 @@
 package org.example.user;
 
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
@@ -92,5 +93,22 @@ public class UserService {
         User user = userRepository.findByUserName(userName)
                 .orElseThrow(() -> new RuntimeException("로그인 정보를 찾을 수 없습니다."));
         return user.getUserId();
+    }
+
+    /** 현재 유저 포인트 확인 */
+    @Transactional
+    public long getUserPoint(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+        return user.getCurrentPoint();
+    }
+
+    /** (테스트/관리자용) 유저에게 포인트 추가 */
+    @Transactional
+    public long grantTestPoint(Long userId, long amount) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+        user.forceSetPoint(amount);
+        return user.getCurrentPoint();
     }
 }
