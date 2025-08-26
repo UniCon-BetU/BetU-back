@@ -105,26 +105,7 @@ public class CommunityService {
     public List<PostSummaryResponse> getAllPosts() {
         List<Post> posts = postRepository.findAllByOrderByPostIdDesc();
 
-        return posts.stream()
-                .map(p -> {
-                    List<PostImage> images = postImageRepository.findByPost_PostIdOrderBySortOrderAsc(p.getPostId());
-                    String thumbnail = images.isEmpty() ? null : images.get(0).getImageUrl();
-
-                    int commentCount = commentRepository.findByPost_PostId(p.getPostId()).size();
-
-                    return new PostSummaryResponse(
-                            p.getPostId(),
-                            p.getCrew() != null ? p.getCrew().getCrewId() : null,
-                            p.getUser().getUserId(),
-                            p.getUser().getUserName(),
-                            p.getPostTitle(),
-                            preview(p.getPostContent(), 120),
-                            p.getPostLikeCnt(),
-                            commentCount,
-                            thumbnail
-                    );
-                })
-                .toList();
+        return toPostSummaryResponses(posts);
     }
 
     // 크루별 게시글 목록
@@ -140,31 +121,26 @@ public class CommunityService {
             posts = postRepository.findByCrew_CrewIdOrderByPostIdDesc(crewId);
         }
 
-        return posts.stream()
-                .map(p -> {
-                    List<PostImage> images = postImageRepository.findByPost_PostIdOrderBySortOrderAsc(p.getPostId());
-                    String thumbnail = images.isEmpty() ? null : images.get(0).getImageUrl();
-
-                    int commentCount = commentRepository.findByPost_PostId(p.getPostId()).size();
-
-                    return new PostSummaryResponse(
-                            p.getPostId(),
-                            p.getCrew() != null ? p.getCrew().getCrewId() : null,
-                            p.getUser().getUserId(),
-                            p.getUser().getUserName(),
-                            p.getPostTitle(),
-                            preview(p.getPostContent(), 120),
-                            p.getPostLikeCnt(),
-                            commentCount,
-                            thumbnail
-                    );
-                })
-                .toList();
+        return toPostSummaryResponses(posts);
     }
 
-    private String preview(String content, int max) {
-        if (content == null) return "";
-        return content.length() <= max ? content : content.substring(0, max) + "...";
+    @Transactional(readOnly = true)
+    public List<PostSummaryResponse> getPopularPosts(Long crewId) {
+        List<Post> posts = (crewId == null)
+                ? postRepository.findByCrewIsNullAndPostLikeCntGreaterThanEqualOrderByPostIdDesc(10)
+                : postRepository.findByCrew_CrewIdAndPostLikeCntGreaterThanEqualOrderByPostIdDesc(crewId, 10);
+        return toPostSummaryResponses(posts);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PostSummaryResponse> searchPostsLatest(String query) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        List<Post> posts = postRepository
+                .findByPostTitleContainingIgnoreCaseOrPostContentContainingIgnoreCaseOrderByPostIdDesc(query, query);
+
+        return toPostSummaryResponses(posts);
     }
 
     // 게시글 상세 (이미지 + 댓글)
@@ -229,9 +205,34 @@ public class CommunityService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
 
-        Comment c = new Comment(null, post, user, req.getContent());
+        Comment c = Comment.builder()
+                .post(post)
+                .user(user)
+                .commentContent(req.getContent())
+                .build();
         return commentRepository.save(c).getCommentId();
     }
+
+//    @Transactional
+//    public Long addReply(Long userId, Long parentCommentId, String content) {
+//        Comment parent = commentRepository.findById(parentCommentId)
+//                .orElseThrow(() -> new EntityNotFoundException("부모 댓글 없음"));
+//
+//        User user = userRepository.findById(userId)
+//                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+//
+//        Comment reply = Comment.builder()
+//                .post(parent.getPost()) // 같은 게시글에 속해야 함
+//                .user(user)
+//                .parent(parent)         // ✅ 부모 설정
+//                .commentContent(content)
+//                .build();
+//
+//        // 양방향 편의
+//        parent.addChild(reply);
+//
+//        return commentRepository.save(reply).getCommentId();
+//    }
 
     // 댓글 삭제
     @Transactional
@@ -242,6 +243,40 @@ public class CommunityService {
             throw new SecurityException("삭제 권한이 없습니다.");
         }
         commentRepository.deleteById(commentId);
+    }
+
+    private List<PostSummaryResponse> toPostSummaryResponses(List<Post> posts) {
+        return posts.stream()
+                .map(p -> {
+                    // 썸네일(첫 번째 이미지)
+                    List<PostImage> images = postImageRepository
+                            .findByPost_PostIdOrderBySortOrderAsc(p.getPostId());
+                    String thumbnail = images.isEmpty() ? null : images.get(0).getImageUrl();
+
+                    // 댓글 개수
+                    int commentCount = commentRepository.findByPost_PostId(p.getPostId()).size();
+
+                    // 프리뷰(최대 120자)
+                    String previewContent = preview(p.getPostContent(), 120);
+
+                    return new PostSummaryResponse(
+                            p.getPostId(),
+                            p.getCrew() != null ? p.getCrew().getCrewId() : null,
+                            p.getUser().getUserId(),
+                            p.getUser().getUserName(),
+                            p.getPostTitle(),
+                            previewContent,
+                            p.getPostLikeCnt(),
+                            commentCount,
+                            thumbnail
+                    );
+                })
+                .toList();
+    }
+
+    private String preview(String content, int max) {
+        if (content == null) return "";
+        return content.length() <= max ? content : content.substring(0, max) + "...";
     }
 
 }
