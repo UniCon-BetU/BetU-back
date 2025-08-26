@@ -25,7 +25,7 @@ public class Post {
     @JoinColumn(name = "user_id", nullable = false)   // 작성자 필수
     private User user;
 
-    @Lob
+    @Column(length = 200)
     private String postTitle;
 
     @Lob
