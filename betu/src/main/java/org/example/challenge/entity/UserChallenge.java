@@ -30,6 +30,10 @@ public class UserChallenge {
 
     private long progressDay;
 
+    @Column(nullable = false)
+    private Long betAmount = 0L;
+
+
     public UserChallenge(User user, Challenge challenge, UserChallengeRole userChallengeRole) {
         this.user = user;
         this.challenge = challenge;
@@ -53,5 +57,9 @@ public class UserChallenge {
 
     public void changeStatus(UserChallengeStatus userChallengeStatus) {
         this.userChallengeStatus = userChallengeStatus;
+    }
+
+    public void makeBetAmount(Long betAmount) {
+        this.betAmount = betAmount;
     }
 }

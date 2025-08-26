@@ -128,7 +128,7 @@ public class ChallengeService {
 
     // 챌린지 참가
     @Transactional
-    public ChallengeDetailResponse joinChallenge(Long userId, Long challengeId) {
+    public ChallengeDetailResponse joinChallenge(Long userId, Long challengeId, BetAmountRequest betAmountRequest) {
         // 챌린지 확인
         Challenge challenge = challengeRepository.findWithCrewByChallengeId(challengeId)
                 .orElseThrow(() -> new EntityNotFoundException("챌린지를 찾을 수 없습니다."));
@@ -147,9 +147,17 @@ public class ChallengeService {
             throw new IllegalStateException("이미 해당 챌린지에 참가 중입니다.");
         }
 
-        // 상태 전환 (NOT_STARTED/COMPLETED/FAILED → IN_PROGRESS)
+        // 포인트 차감
+        User user = (uc.getUser() != null) ? uc.getUser() : userRepository.getReferenceById(userId);
+        if (user.getPoint() < betAmountRequest.getBetAmount()) {
+            throw new IllegalStateException("포인트가 부족합니다.");
+        }
+        user.subtractPoint(betAmountRequest.getBetAmount());  // User 엔티티에 subtractPoint(long) 필요
+
+        // 4) 베팅 금액 기록 + 상태 전환
         UserChallengeStatus prev = uc.getUserChallengeStatus();
-        uc.changeStatus(UserChallengeStatus.IN_PROGRESS);
+        uc.makeBetAmount(betAmountRequest.getBetAmount());                             // ✅ 베팅 포인트 기록
+        uc.changeStatus(UserChallengeStatus.IN_PROGRESS);       // ✅ 참가 시작
         userChallengeRepository.save(uc);
 
         // 5) 참가자 수 증가 규칙
@@ -159,6 +167,53 @@ public class ChallengeService {
         }
 
         return toDetailResponse(challenge, true, 0);
+    }
+
+    /** 성공 정산: 스테이크 전액 환급 + 랜덤 보너스, 상태 COMPLETED */
+    @Transactional
+    public SettleSuccessResponse settleSuccess(Long userId, Long challengeId) {
+        UserChallenge uc = userChallengeRepository
+                .findByUser_UserIdAndChallenge_ChallengeId(userId, challengeId)
+                .orElseThrow(() -> new EntityNotFoundException("참여 이력 없음"));
+
+        if (uc.getUserChallengeStatus() == UserChallengeStatus.COMPLETED) {
+            throw new IllegalStateException("이미 완료된 챌린지입니다.");
+        }
+        if (uc.getBetAmount() == null || uc.getBetAmount() <= 0) {
+            throw new IllegalStateException("베팅 금액이 없습니다.");
+        }
+
+        long refund = uc.getBetAmount();
+
+        // 1) 스테이크 환급
+        uc.getUser().addPoint(refund);
+
+        // 2) 랜덤 보상 (0~100%)
+        int percent = (int) Math.round(Math.random() * 100.0);
+        long bonus = Math.round(refund * (percent / 100.0));
+        if (bonus > 0) uc.getUser().addPoint(bonus);
+
+        // 3) 상태 업데이트
+        uc.changeStatus(UserChallengeStatus.COMPLETED);
+
+        return new SettleSuccessResponse(refund, bonus);
+    }
+
+    /** 실패/취소: 스테이크 환급(정책상 전액/일부), 상태 FAILED */
+    @Transactional
+    public void cancelBet(Long userId, Long challengeId) {
+        UserChallenge uc = userChallengeRepository
+                .findByUser_UserIdAndChallenge_ChallengeId(userId, challengeId)
+                .orElseThrow(() -> new EntityNotFoundException("참여 이력 없음"));
+
+        if (uc.getUserChallengeStatus() == UserChallengeStatus.COMPLETED
+                || uc.getUserChallengeStatus() == UserChallengeStatus.FAILED) {
+            return; // 이미 종료 상태
+        }
+        long stake = uc.getBetAmount() == null ? 0L : uc.getBetAmount();
+        if (stake <= 0) return;
+
+        uc.changeStatus(UserChallengeStatus.FAILED);
     }
 
     // 인기 챌린지 3개 조회
