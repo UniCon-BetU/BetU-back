@@ -60,7 +60,7 @@ public class UserController {
         return ResponseEntity.ok("비밀번호 변경 성공");
     }
 
-    @GetMapping("/{userId}/points")
+    @GetMapping("/points")
     @Operation(summary = "유저 포인트 확인")
     public ResponseEntity<Long> getUserPoint(HttpServletRequest request) {
         Long userId = userService.getUserIdFromToken(request);
