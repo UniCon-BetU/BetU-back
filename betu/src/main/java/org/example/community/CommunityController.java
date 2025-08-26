@@ -118,11 +118,11 @@ public class CommunityController {
         return ResponseEntity.ok(communityService.getPopularPosts(crewId));
     }
 
-    @GetMapping("/posts/search-latest")
+    @GetMapping("/posts/search")
     @Operation(summary = "게시글 검색(최신순, 페이징 없음)",
             description = "postTitle 또는 postContent에 키워드가 포함된 게시글을 postId DESC로 정렬해 반환")
-    public ResponseEntity<List<PostSummaryResponse>> searchPostsLatest(@RequestParam String query) {
-        return ResponseEntity.ok(communityService.searchPostsLatest(query));
+    public ResponseEntity<List<PostSummaryResponse>> searchPostsLatest(@RequestParam(required = false) Long crewId, @RequestParam String query) {
+        return ResponseEntity.ok(communityService.searchPostsLatest(query, crewId));
     }
 
     @GetMapping("/posts/{postId}")
