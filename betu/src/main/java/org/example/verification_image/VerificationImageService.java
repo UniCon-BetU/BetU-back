@@ -34,12 +34,12 @@ public class VerificationImageService {
         String prefix = String.format("challenge/%d/user/%d", challengeId, userId);
         String imageUrl = s3Uploader.uploadImageUnderPrefix(image, prefix);
 
-        VerificationImage vi = new VerificationImage(
-                null,
-                userChallenge,
-                imageUrl,
-                LocalDateTime.now()
-        );
+        VerificationImage vi = VerificationImage.builder()
+                .userChallenge(userChallenge)
+                .imageUrl(imageUrl)
+                .uploadedAt(LocalDateTime.now())
+                .build();
+
         verificationImageRepository.save(vi);
 
         userChallenge.increaseProgressDay();

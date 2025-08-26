@@ -2,6 +2,7 @@ package org.example.verification_image;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.challenge.entity.UserChallenge;
@@ -13,6 +14,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class VerificationImage {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
