@@ -68,7 +68,7 @@ public class UserController {
         return ResponseEntity.ok(point);
     }
 
-    @PostMapping("/{userId}/points/grant")
+    @PostMapping("/points/grant")
     @Operation(summary = "(테스트/관리자) 유저에게 포인트 추가")
     public ResponseEntity<Long> grantTestPoint(
             HttpServletRequest request, @RequestParam long amount
