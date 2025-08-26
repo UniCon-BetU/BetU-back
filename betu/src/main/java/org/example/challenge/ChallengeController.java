@@ -42,16 +42,6 @@ public class ChallengeController {
         return ResponseEntity.ok(challengeService.getChallengeWithDetails(userId, challengeId));
     }
 
-    @PostMapping("/{challengeId}/join")
-    @Operation(summary = "챌린지 참가")
-    public ResponseEntity<ChallengeDetailResponse> joinChallenge(
-            HttpServletRequest request,
-            @PathVariable Long challengeId
-    ) {
-        Long userId = userService.getUserIdFromToken(request);
-        return ResponseEntity.ok(challengeService.joinChallenge(userId, challengeId));
-    }
-
     @DeleteMapping("/{challengeId}")
     @Operation(summary = "챌린지 삭제")
     public ResponseEntity<Void> deleteChallenge(
@@ -117,4 +107,44 @@ public class ChallengeController {
         return ResponseEntity.ok(challengeService.getChallengesByTags(tags));
     }
 
+    /** 챌린지 참가(포인트 차감 + IN_PROGRESS 전환) */
+    @PostMapping("/{challengeId}/join")
+    @Operation(summary = "챌린지 참가(포인트 베팅)",
+            description = "body로 betAmount를 받아 유저 포인트를 차감하고, UserChallenge.betAmount에 기록 후 상태를 IN_PROGRESS로 전환합니다.")
+    public ResponseEntity<?> join(
+            HttpServletRequest request,
+            @PathVariable Long challengeId,
+            @RequestBody BetAmountRequest req
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+        // 서비스 메서드 시그니처 그대로 호출
+        return ResponseEntity.ok(
+                // joinChallenge가 ChallengeDetailResponse를 반환하므로 그대로 리턴
+                challengeService.joinChallenge(userId, challengeId, req)
+        );
+    }
+
+    /** 성공 정산(스테이크 환급 + 랜덤보너스 + COMPLETED) */
+    @PostMapping("/{challengeId}/settle-success")
+    @Operation(summary = "성공 정산",
+            description = "베팅했던 포인트를 전액 환급하고, 추가로 랜덤 보너스 포인트를 적립합니다. 상태는 COMPLETED로 전환됩니다.")
+    public ResponseEntity<SettleSuccessResponse> settleSuccess(
+            HttpServletRequest request,
+            @PathVariable Long challengeId
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+        return ResponseEntity.ok(challengeService.settleSuccess(userId, challengeId));
+    }
+
+    /** 실패/취소(환급 + FAILED) */
+    @PostMapping("/{challengeId}/cancel")
+    @Operation(summary = "실패/취소 정산",
+            description = "정책에 따라 전액/일부 환급합니다. 상태는 FAILED로 전환됩니다.")
+    public ResponseEntity<Void> cancel(
+            HttpServletRequest request,
+            @PathVariable Long challengeId) {
+        Long userId = userService.getUserIdFromToken(request);
+        challengeService.cancelBet(userId, challengeId);
+        return ResponseEntity.ok().build();
+    }
 }
