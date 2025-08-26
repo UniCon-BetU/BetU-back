@@ -22,6 +22,17 @@ public class VerificationImage {
     @JoinColumn(name = "user_challenge_id", nullable = false)
     private UserChallenge userChallenge;
 
+    @Column(nullable = false)
+    private boolean certified = false;
+
     private String imageUrl;
     private LocalDateTime uploadedAt;
+
+    public void markCertified() {
+        this.certified = true;
+    }
+
+    public void revokeCertification() {
+        this.certified = false;
+    }
 }
