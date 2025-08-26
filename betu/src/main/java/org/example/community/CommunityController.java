@@ -103,11 +103,26 @@ public class CommunityController {
     }
 
     @GetMapping("/crews/posts")
-    @Operation(summary = "크루별 게시글 목록")
+    @Operation(summary = "크루별 게시글 조회 (최신순)")
     public ResponseEntity<List<PostSummaryResponse>> getPostsByCrew(
             @RequestParam(required = false) Long crewId
     ) {
         return ResponseEntity.ok(communityService.getPostsByCrew(crewId));
+    }
+
+    @GetMapping("/posts/popular")
+    @Operation(summary = "크루별 게시글 조회 (인기순)", description = "좋아요 10개 이상 게시물. crewId 없으면 전체(crewId=null)만, 있으면 해당 크루만 조회")
+    public ResponseEntity<List<PostSummaryResponse>> getPopularPosts(
+            @RequestParam(required = false) Long crewId
+    ) {
+        return ResponseEntity.ok(communityService.getPopularPosts(crewId));
+    }
+
+    @GetMapping("/posts/search-latest")
+    @Operation(summary = "게시글 검색(최신순, 페이징 없음)",
+            description = "postTitle 또는 postContent에 키워드가 포함된 게시글을 postId DESC로 정렬해 반환")
+    public ResponseEntity<List<PostSummaryResponse>> searchPostsLatest(@RequestParam String query) {
+        return ResponseEntity.ok(communityService.searchPostsLatest(query));
     }
 
     @GetMapping("/posts/{postId}")
