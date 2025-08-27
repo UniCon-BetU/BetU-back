@@ -3,16 +3,13 @@ package org.example.community;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.example.community.dto.*;
-import org.example.community.entity.Comment;
-import org.example.community.entity.Post;
-import org.example.community.entity.PostImage;
-import org.example.community.entity.PostLike;
-import org.example.community.repository.CommentRepository;
-import org.example.community.repository.PostImageRepository;
-import org.example.community.repository.PostLikeRepository;
-import org.example.community.repository.PostRepository;
+import org.example.community.entity.*;
+import org.example.community.repository.*;
 import org.example.crew.entity.Crew;
+import org.example.crew.entity.UserCrew;
+import org.example.crew.entity.UserCrewRole;
 import org.example.crew.repository.CrewRepository;
+import org.example.crew.repository.UserCrewRepository;
 import org.example.user.User;
 import org.example.user.UserRepository;
 import org.example.general.S3Uploader;
@@ -23,7 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +34,9 @@ public class CommunityService {
     private final UserRepository userRepository;
     private final S3Uploader s3Uploader;
     private final PostLikeRepository postLikeRepository;
+    private final PostReportRepository postReportRepository;
+    private final UserCrewRepository userCrewRepository;
+    private final CommentLikeRepository commentLikeRepository;
 
     // 게시글 작성
     @Transactional
@@ -140,24 +141,27 @@ public class CommunityService {
         );
     }
 
-    // 게시글 상세 (이미지 + 댓글)
     @Transactional(readOnly = true)
     public PostDetailResponse getPostDetail(Long userId, Long postId) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new EntityNotFoundException("게시글이 없습니다."));
 
+        // 이미지
         List<PostImage> images = postImageRepository.findByPost_PostIdOrderBySortOrderAsc(postId);
         List<String> imageUrls = images.stream().map(PostImage::getImageUrl).toList();
 
-        List<Comment> comments = commentRepository.findByPost_PostId(postId);
-        List<PostDetailResponse.CommentItem> commentItems = comments.stream()
-                .map(c -> new PostDetailResponse.CommentItem(
-                        c.getCommentId(),
-                        c.getUser().getUserId(),
-                        c.getUser().getUserName(), // User에 맞게 수정
-                        c.getCommentContent()
-                ))
-                .toList();
+        // 댓글 전체 로드 (user, parent 포함 - @EntityGraph로 N+1 회피)
+        List<Comment> all = commentRepository.findByPost_PostIdOrderByCommentIdAsc(postId);
+
+        // 내가 좋아요 누른 댓글 id를 한 번에 조회
+        Set<Long> likedSet = Collections.emptySet();
+        if (userId != null && !all.isEmpty()) {
+            List<Long> ids = all.stream().map(Comment::getCommentId).toList();
+            likedSet = new HashSet<>(commentLikeRepository.findLikedCommentIdsByUser(userId, ids));
+        }
+
+        // 트리 변환(좋아요 카운트/likedByMe 반영)
+        List<CommentTreeResponse> commentTree = buildCommentTree(all, likedSet);
 
         boolean liked = postLikeRepository.existsByUserIdAndPostId(userId, postId);
 
@@ -165,14 +169,44 @@ public class CommunityService {
                 post.getPostId(),
                 post.getCrew() != null ? post.getCrew().getCrewId() : null,
                 post.getUser().getUserId(),
-                post.getUser().getUserName(), // 필요 시 변경
+                post.getUser().getUserName(),
                 post.getPostTitle(),
                 post.getPostContent(),
                 post.getPostLikeCnt(),
                 imageUrls,
-                commentItems,
+                commentTree,
                 liked
         );
+    }
+
+    private List<CommentTreeResponse> buildCommentTree(List<Comment> all, Set<Long> likedSet) {
+        // 1) commentId -> DTO 미리 생성 (삭제/likedByMe 반영)
+        Map<Long, CommentTreeResponse> dtoMap = new LinkedHashMap<>();
+        for (Comment c : all) {
+            boolean likedByMe = likedSet != null && likedSet.contains(c.getCommentId());
+            dtoMap.put(c.getCommentId(), CommentTreeResponse.of(c, likedByMe));
+        }
+
+        // 2) 루트 모으기 + 부모-자식 연결
+        List<CommentTreeResponse> roots = new ArrayList<>();
+        for (Comment c : all) {
+            CommentTreeResponse dto = dtoMap.get(c.getCommentId());
+            if (c.getParent() == null) {
+                // 루트 댓글
+                roots.add(dto);
+            } else {
+                // 부모가 있으면 부모 DTO의 replies에 추가
+                Comment parent = c.getParent();
+                CommentTreeResponse parentDto = dtoMap.get(parent.getCommentId());
+                if (parentDto != null) {
+                    parentDto.getReplies().add(dto);      // 또는 parentDto.addReply(dto);
+                } else {
+                    // 데이터 무결성 방어: 부모 DTO가 없으면 루트로라도 노출
+                    roots.add(dto);
+                }
+            }
+        }
+        return roots;
     }
 
     // 게시글 좋아요
@@ -194,52 +228,180 @@ public class CommunityService {
         return new PostLikeResponse(!exists, post.getPostLikeCnt());
     }
 
-    // 댓글 작성
-    @Transactional
-    public Long addComment(Long userId, CommentCreateRequest req) {
-        Post post = postRepository.findById(req.getPostId())
-                .orElseThrow(() -> new EntityNotFoundException("게시글 없음"));
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
 
-        Comment c = Comment.builder()
+    @Transactional
+    public Long createRootComment(Long userId, CommentCreateRequest commentCreateRequest) {
+        if (commentCreateRequest.getContent() == null || commentCreateRequest.getContent().isBlank()) {
+            throw new IllegalArgumentException("댓글 내용이 비어 있습니다.");
+        }
+
+        Post post = postRepository.findById(commentCreateRequest.getPostId())
+                .orElseThrow(() -> new EntityNotFoundException("게시글을 찾을 수 없습니다."));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+
+        Comment comment = Comment.builder()
                 .post(post)
                 .user(user)
-                .commentContent(req.getContent())
+                .commentContent(commentCreateRequest.getContent())
                 .build();
-        return commentRepository.save(c).getCommentId();
+
+        return commentRepository.save(comment).getCommentId();
     }
 
-//    @Transactional
-//    public Long addReply(Long userId, Long parentCommentId, String content) {
-//        Comment parent = commentRepository.findById(parentCommentId)
-//                .orElseThrow(() -> new EntityNotFoundException("부모 댓글 없음"));
-//
-//        User user = userRepository.findById(userId)
-//                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
-//
-//        Comment reply = Comment.builder()
-//                .post(parent.getPost()) // 같은 게시글에 속해야 함
-//                .user(user)
-//                .parent(parent)         // ✅ 부모 설정
-//                .commentContent(content)
-//                .build();
-//
-//        // 양방향 편의
-//        parent.addChild(reply);
-//
-//        return commentRepository.save(reply).getCommentId();
-//    }
+    @Transactional
+    public Long createReply(Long userId, ReplyCommentCreateRequest replyCommentCreateRequest) {
+        if (replyCommentCreateRequest.getCommentContent() == null || replyCommentCreateRequest.getCommentContent().isBlank()) {
+            throw new IllegalArgumentException("댓글 내용이 비어 있습니다.");
+        }
 
-    // 댓글 삭제
+        Comment parent = commentRepository.findById(replyCommentCreateRequest.getCommentId())
+                .orElseThrow(() -> new EntityNotFoundException("부모 댓글을 찾을 수 없습니다."));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+
+        // 부모와 동일한 게시글에 속하도록 보장
+        Comment reply = Comment.builder()
+                .post(parent.getPost())
+                .user(user)
+                .parent(parent)
+                .commentContent(replyCommentCreateRequest.getCommentContent())
+                .build();
+
+        // 양방향 편의 메서드 (children 컬렉션에도 추가)
+        parent.addChild(reply);
+
+        return commentRepository.save(reply).getCommentId();
+    }
+
     @Transactional
     public void deleteComment(Long userId, Long commentId) {
-        Comment c = commentRepository.findById(commentId)
+        Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new EntityNotFoundException("댓글 없음"));
-        if (!c.getUser().getUserId().equals(userId)) {
+
+        if (!comment.getUser().getUserId().equals(userId)) {
             throw new SecurityException("삭제 권한이 없습니다.");
         }
-        commentRepository.deleteById(commentId);
+
+        comment.softDelete();
+    }
+
+    @Transactional
+    public Map<String, Object> toggleCommentLike(Long userId, Long commentId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new EntityNotFoundException("댓글 없음"));
+        User user = userRepository.getReferenceById(userId);
+
+        boolean exists = commentLikeRepository.existsByUser_UserIdAndComment_CommentId(userId, commentId);
+
+        if (exists) {
+            commentLikeRepository.deleteByUser_UserIdAndComment_CommentId(userId, commentId);
+            comment.decreaseLike();
+        } else {
+            commentLikeRepository.save(new CommentLike(comment, user));
+            comment.increaseLike();
+        }
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("liked", !exists);
+        res.put("likeCount", comment.getLikeCount());
+        return res;
+    }
+
+    /** 유저가 게시글 신고 */
+    public Long reportPost(Long reporterId, Long postId, PostReportCreateRequest req) {
+        User reporter = userRepository.findById(reporterId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("게시글 없음"));
+
+        if (postReportRepository.existsByReporter_UserIdAndPost_PostId(reporterId, postId)) {
+            throw new IllegalStateException("이미 신고한 게시글입니다.");
+        }
+
+        String reason = (req == null || req.getReason() == null) ? "" : req.getReason().trim();
+
+        PostReport pr = PostReport.builder()
+                .post(post)
+                .reporter(reporter)
+                .reason(reason)
+                .status(ReportStatus.PENDING)
+                .build();
+
+        postReportRepository.save(pr);
+        return pr.getReportId();
+    }
+
+    /** 내가 처리 가능한 PENDING 신고 목록 */
+    @Transactional(readOnly = true)
+    public List<PostReportResponse> getMyPendingReports(Long viewerUserId) {
+        User me = userRepository.findById(viewerUserId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+
+        List<PostReport> all = postReportRepository.findAllByStatusWithPostAndCrew(ReportStatus.PENDING);
+
+        if (me.isAdmin()) {
+            return all.stream().map(PostReportResponse::from).toList();
+        }
+
+        // 크루 OWNER인 건만 남기기 (crew=null=public 은 관리자만)
+        return all.stream()
+                .filter(pr -> canModerate(me, pr))
+                .map(PostReportResponse::from)
+                .toList();
+    }
+
+    /** 신고 수락(인정) */
+    public void acceptReport(Long moderatorUserId, Long reportId) {
+        User me = userRepository.findById(moderatorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+
+        PostReport pr = postReportRepository.findById(reportId)
+                .orElseThrow(() -> new EntityNotFoundException("신고 없음"));
+
+        assertCanModerate(me, pr);
+        pr.accept();
+        Post post = pr.getPost();
+
+        postImageRepository.deleteByPost_PostId(post.getPostId());
+        commentRepository.deleteByPost_PostId(post.getPostId());
+        postLikeRepository.deleteByPostId(post.getPostId());
+
+        postRepository.delete(post);
+    }
+
+    /** 신고 기각 */
+    public void rejectReport(Long moderatorUserId, Long reportId) {
+        User me = userRepository.findById(moderatorUserId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+
+        PostReport pr = postReportRepository.findById(reportId)
+                .orElseThrow(() -> new EntityNotFoundException("신고 없음"));
+
+        assertCanModerate(me, pr);
+        pr.reject();
+    }
+
+    // ===== 권한 판별 =====
+
+    private void assertCanModerate(User me, PostReport pr) {
+        if (!canModerate(me, pr)) {
+            throw new SecurityException("신고 처리 권한이 없습니다.");
+        }
+    }
+
+    private boolean canModerate(User me, PostReport pr) {
+        if (me.isAdmin()) return true;
+
+        // 게시글 crew가 null이면 public => 관리자만 가능 (crew OWNER 불가)
+        var crew = pr.getPost().getCrew();
+        if (crew == null) {
+            return false;
+        }
+        // crew 챌린지 => 해당 crew OWNER이면 가능
+        return userCrewRepository.existsByUser_UserIdAndCrew_CrewIdAndUserCrewRole(
+                me.getUserId(), crew.getCrewId(), UserCrewRole.OWNER
+        );
     }
 
     private List<PostSummaryResponse> toPostSummaryResponses(List<Post> posts) {

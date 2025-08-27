@@ -11,20 +11,12 @@ public class PostDetailResponse {
     private Long postId;
     private Long crewId;
     private Long authorId;
-    private String authorName;// 필요 시
-    private String title;
-    private String content;
-    private Integer likeCount;
-    private List<String> imageUrls;        // 정렬된 이미지 URL 목록
-    private List<CommentItem> comments;    // 댓글 목록
-    private boolean liked;
+    private String authorName;
+    private String postTitle;
+    private String postContent;
+    private int postLikeCnt;
+    private List<String> imageUrls;
+    private List<CommentTreeResponse> commentTree;
 
-    @Getter
-    @AllArgsConstructor
-    public static class CommentItem {
-        private Long commentId;
-        private Long userId;
-        private String userName;           // 필요 시
-        private String content;
-    }
+    private boolean liked;
 }
