@@ -111,4 +111,12 @@ public class UserService {
         user.forceSetPoint(amount);
         return user.getCurrentPoint();
     }
+
+    /** 유저를 관리자(ADMIN)로 승격 */
+    public void promoteToAdmin(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+        user.makeAdmin(); // 👈 role 업데이트
+    }
+
 }

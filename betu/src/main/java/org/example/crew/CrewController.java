@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.crew.dto.CrewCreateRequest;
 import org.example.crew.dto.CrewJoinRequest;
+import org.example.crew.dto.CrewRankingResponse;
 import org.example.crew.dto.CrewResponse;
 import org.example.user.UserService;
 import org.springframework.http.ResponseEntity;
@@ -70,5 +71,12 @@ public class CrewController {
     @Operation(summary = "그룹 이름으로 검색")
     public ResponseEntity<List<CrewResponse>> searchCrews(@RequestParam String keyword) {
         return ResponseEntity.ok(crewService.searchCrewsByName(keyword));
+    }
+
+
+    @GetMapping("/{crewId}/ranking")
+    @Operation(summary = "크루 내 랭킹", description = "크루에서 챌린지를 가장 많이 한 사람 순으로 반환")
+    public ResponseEntity<List<CrewRankingResponse>> getCrewRanking(@PathVariable Long crewId) {
+        return ResponseEntity.ok(crewService.getCrewRanking(crewId));
     }
 }

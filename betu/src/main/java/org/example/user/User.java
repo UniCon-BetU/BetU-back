@@ -21,12 +21,22 @@ public class User {
     private String userEmail;
     private String userPassword;
 
+    @Builder.Default
     @Column(nullable = false)
-    private Long point = 0L;   // 기본 0 포인트
+    private Long point = 0L;
 
     private String refreshToken;
-    // 프로필 이미지, 레벨 (도전해서 얻은 포인트 누적)
-    // 나이
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserRole role = UserRole.USER;
+
+    public void makeAdmin() { this.role = UserRole.ADMIN; }
+
+    public boolean isAdmin() {
+        return this.role == UserRole.ADMIN;
+    }
 
     public void updateRefreshToken(String newRefreshToken){
         this.refreshToken = newRefreshToken;
