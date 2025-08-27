@@ -1,11 +1,17 @@
 package org.example.verification_image;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.example.challenge.entity.Challenge;
+import org.example.challenge.entity.ChallengeScope;
 import org.example.challenge.entity.UserChallenge;
+import org.example.challenge.entity.UserChallengeStatus;
 import org.example.challenge.repository.ChallengeRepository;
 import org.example.challenge.repository.UserChallengeRepository;
+import org.example.crew.entity.UserCrewRole;
+import org.example.crew.repository.UserCrewRepository;
 import org.example.general.S3Uploader;
+import org.example.user.User;
 import org.example.user.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +30,7 @@ public class VerificationImageService {
     private final S3Uploader s3Uploader; // S3 업로드 유틸 (이미 구현했다고 가정)
     private final UserRepository userRepository;
     private final ChallengeRepository challengeRepository;
+    private final UserCrewRepository userCrewRepository;
 
     // 인증 이미지 업로드
     public Long uploadVerification(Long userId, Long challengeId, MultipartFile image) throws IOException {
@@ -46,5 +54,79 @@ public class VerificationImageService {
         userChallengeRepository.save(userChallenge);
 
         return vi.getCertificationImageId();
+    }
+
+    @Transactional(readOnly = true)
+    public List<VerificationImageResponse> getMyPendingImages(Long userId) {
+        User me = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+
+        List<VerificationImage> all = verificationImageRepository.findAllByStatusWithChallengeAndCrew(VerificationStatus.PENDING);
+
+        List<VerificationImage> filtered;
+        if (me.isAdmin()) {
+            filtered = all;
+        } else {
+            filtered = all.stream()
+                    .filter(vi -> canModerate(me, vi))
+                    .toList();
+        }
+
+        // ✅ 여기서 DTO로 변환까지 처리
+        return filtered.stream()
+                .map(VerificationImageResponse::from)
+                .toList();
+    }
+
+    /** 승인 */
+    public void approve(Long userId, Long imageId) {
+        User me = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+
+        VerificationImage vi = verificationImageRepository.findById(imageId)
+                .orElseThrow(() -> new EntityNotFoundException("인증 이미지 없음"));
+
+        assertCanModerate(me, vi);
+        vi.markVerified();
+    }
+
+    /** 거절 */
+    public void reject(Long userId, Long imageId) {
+        User me = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+
+        VerificationImage vi = verificationImageRepository.findById(imageId)
+                .orElseThrow(() -> new EntityNotFoundException("인증 이미지 없음"));
+
+        assertCanModerate(me, vi);
+        vi.revokeVerification();
+
+        var uc = vi.getUserChallenge();
+
+        uc.changeStatus(UserChallengeStatus.FAILED);
+        userChallengeRepository.save(uc);
+    }
+
+    private void assertCanModerate(User me, VerificationImage vi) {
+        if (!canModerate(me, vi)) {
+            throw new SecurityException("인증 이미지를 처리할 권한이 없습니다.");
+        }
+    }
+
+    private boolean canModerate(User me, VerificationImage vi) {
+        if (me.isAdmin()) return true;
+
+        Challenge ch = vi.getUserChallenge().getChallenge();
+        // PUBLIC: 관리자만 가능
+        if (ch.getChallengeScope() == ChallengeScope.PUBLIC) {
+            return false;
+        }
+        // CREW (또는 팀 범위): 해당 크루의 OWNER여야 가능
+        if (ch.getCrew() != null) {
+            return userCrewRepository.existsByUser_UserIdAndCrew_CrewIdAndUserCrewRole(
+                    me.getUserId(), ch.getCrew().getCrewId(), UserCrewRole.OWNER
+            );
+        }
+        return false;
     }
 }

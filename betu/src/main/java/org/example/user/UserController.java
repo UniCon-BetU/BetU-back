@@ -77,5 +77,12 @@ public class UserController {
         long point = userService.grantTestPoint(userId, amount);
         return ResponseEntity.ok(point);
     }
+
+    @PostMapping("/admin")
+    public ResponseEntity<String> promoteToAdmin(HttpServletRequest request) {
+        Long userId = userService.getUserIdFromToken(request);
+        userService.promoteToAdmin(userId);
+        return ResponseEntity.ok("User " + userId + " is now an ADMIN.");
+    }
 }
 

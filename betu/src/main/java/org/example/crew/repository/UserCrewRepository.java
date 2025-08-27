@@ -2,6 +2,7 @@ package org.example.crew.repository;
 
 import org.example.crew.entity.Crew;
 import org.example.crew.entity.UserCrew;
+import org.example.crew.entity.UserCrewRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,4 +19,8 @@ public interface UserCrewRepository extends JpaRepository<UserCrew, Long> {
 
     @Query("SELECT uc.crew FROM UserCrew uc WHERE uc.user.userId = :userId")
     List<Crew> findCrewsByUserId(@Param("userId") Long userId);
+
+    boolean existsByUser_UserIdAndCrew_CrewIdAndUserCrewRole(
+            Long userId, Long crewId, UserCrewRole role
+    );
 }
