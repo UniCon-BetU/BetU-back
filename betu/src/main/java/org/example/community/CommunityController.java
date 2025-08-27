@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -61,14 +62,37 @@ public class CommunityController {
     }
 
     // 댓글 작성
-    @PostMapping("/comments")
-    @Operation(summary = "댓글 작성")
-    public ResponseEntity<Long> addComment(
+    @PostMapping("/root")
+    @Operation(summary = "루트 댓글 작성", description = "게시글에 새로운 댓글을 작성합니다.")
+    public ResponseEntity<Long> createRootComment(
             HttpServletRequest request,
-            @Valid @RequestBody CommentCreateRequest req
+            @RequestBody CommentCreateRequest req
     ) {
         Long userId = userService.getUserIdFromToken(request);
-        return ResponseEntity.ok(communityService.addComment(userId, req));
+        Long commentId = communityService.createRootComment(userId, req);
+        return ResponseEntity.ok(commentId);
+    }
+
+    @PostMapping("/reply")
+    @Operation(summary = "답글 작성", description = "특정 댓글에 답글을 작성합니다.")
+    public ResponseEntity<Long> createReply(
+            HttpServletRequest request,
+            @RequestBody ReplyCommentCreateRequest req
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+        Long replyId = communityService.createReply(userId, req);
+        return ResponseEntity.ok(replyId);
+    }
+
+    @PostMapping("/{commentId}/like")
+    public ResponseEntity<Map<String, Object>> toggleCommentLike(
+            @PathVariable Long commentId,
+            HttpServletRequest request
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+
+        Map<String, Object> result = communityService.toggleCommentLike(userId, commentId);
+        return ResponseEntity.ok(result);
     }
 
     // 댓글 삭제
@@ -143,5 +167,49 @@ public class CommunityController {
     ) {
         Long userId = userService.getUserIdFromToken(request);
         return ResponseEntity.ok(communityService.togglePostLike(userId, postId));
+    }
+
+    @PostMapping("/posts/{postId}")
+    @Operation(summary = "게시글 신고", description = "게시글을 신고합니다.")
+    public ResponseEntity<Long> reportPost(
+            HttpServletRequest request,
+            @PathVariable Long postId,
+            @RequestBody(required = false) PostReportCreateRequest req
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+        Long reportId = communityService.reportPost(userId, postId, req);
+        return ResponseEntity.ok(reportId);
+    }
+
+    @GetMapping("/pending")
+    @Operation(summary = "내가 처리 가능한 신고 목록", description = "관리자/크루 OWNER가 처리해야 할 PENDING 상태의 신고 목록을 가져옵니다.")
+    public ResponseEntity<List<PostReportResponse>> getMyPendingReports(
+            HttpServletRequest request
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+        List<PostReportResponse> list = communityService.getMyPendingReports(userId);
+        return ResponseEntity.ok(list);
+    }
+
+    @PostMapping("/{reportId}/accept")
+    @Operation(summary = "신고 수락", description = "신고를 수락하고 해당 게시글을 삭제합니다.")
+    public ResponseEntity<Void> acceptReport(
+            HttpServletRequest request,
+            @PathVariable Long reportId
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+        communityService.acceptReport(userId, reportId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{reportId}/reject")
+    @Operation(summary = "신고 기각", description = "신고를 기각합니다.")
+    public ResponseEntity<Void> rejectReport(
+            HttpServletRequest request,
+            @PathVariable Long reportId
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+        communityService.rejectReport(userId, reportId);
+        return ResponseEntity.ok().build();
     }
 }
