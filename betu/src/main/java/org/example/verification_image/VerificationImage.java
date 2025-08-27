@@ -24,17 +24,19 @@ public class VerificationImage {
     @JoinColumn(name = "user_challenge_id", nullable = false)
     private UserChallenge userChallenge;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private boolean certified = false;
+    private VerificationStatus verificationStatus = VerificationStatus.PENDING; // 기본값
 
     private String imageUrl;
     private LocalDateTime uploadedAt;
 
-    public void markCertified() {
-        this.certified = true;
+    public void markVerified() {
+        this.verificationStatus = VerificationStatus.APPROVED;
     }
 
-    public void revokeCertification() {
-        this.certified = false;
+    public void revokeVerification() {
+        this.verificationStatus = VerificationStatus.REJECTED;
     }
 }

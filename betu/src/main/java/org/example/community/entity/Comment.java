@@ -30,25 +30,41 @@ public class Comment {
     @JoinColumn(name = "user_id", nullable = false)   // 작성자 필수
     private User user;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "parent_id")
-//    private Comment parent;
-//
-//    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
-//    @OrderBy("commentId ASC")
-//    private List<Comment> children = new ArrayList<>();
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    private Comment parent;
+
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("commentId ASC")
+    private List<Comment> children = new ArrayList<>();
 
     private String commentContent;
 
     private LocalDateTime createdAt;
 
-//    public void addChild(Comment child) {
-//        children.add(child);
-//        child.parent = this;
-//    }
-//
-//    @PrePersist
-//    public void onCreate() {
-//        this.createdAt = LocalDateTime.now();
-//    }
+    @Builder.Default
+    @Column(nullable = false)
+    private int likeCount = 0;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean isDeleted = false;
+
+    public void increaseLike() { this.likeCount++; }
+    public void decreaseLike() { if (this.likeCount > 0) this.likeCount--; }
+
+    public void addChild(Comment child) {
+        children.add(child);
+        child.parent = this;
+    }
+
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
+
+    public void softDelete() {
+        this.isDeleted = true;
+        this.commentContent = "(삭제된 댓글입니다)";
+    }
 }

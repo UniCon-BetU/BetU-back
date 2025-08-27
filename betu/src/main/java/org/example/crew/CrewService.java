@@ -1,8 +1,11 @@
 package org.example.crew;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.example.challenge.repository.UserChallengeRepository;
 import org.example.crew.dto.CrewCreateRequest;
 import org.example.crew.dto.CrewJoinRequest;
+import org.example.crew.dto.CrewRankingResponse;
 import org.example.crew.dto.CrewResponse;
 import org.example.crew.entity.Crew;
 import org.example.crew.entity.UserCrew;
@@ -14,6 +17,7 @@ import org.example.user.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -24,6 +28,7 @@ public class CrewService {
     private final CrewRepository crewRepository;
     private final UserRepository userRepository;
     private final UserCrewRepository userCrewRepository;
+    private final UserChallengeRepository userChallengeRepository;
 
     // 그룹 생성
     // isPublic: true - code null, false - code 생성
@@ -127,7 +132,25 @@ public class CrewService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<CrewRankingResponse> getCrewRanking(Long crewId) {
+        List<Object[]> rows = userChallengeRepository.findUserRankingByCrew(crewId);
 
+        List<CrewRankingResponse> ranking = new ArrayList<>();
+        int rank = 1;
+
+        for (Object[] row : rows) {
+            Long userId = (Long) row[0];
+            Long count = (Long) row[1];
+
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+
+            ranking.add(new CrewRankingResponse(userId, user.getUserName(), count, rank++));
+        }
+
+        return ranking;
+    }
 
     private CrewResponse toResponse(Crew g, UserCrewRole role) {
         return new CrewResponse(g.getCrewId(), g.getCrewName(), g.getCrewCode(), g.getCrewIsPublic(), role);
