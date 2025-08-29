@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.example.challenge.entity.Challenge;
 import org.example.challenge.entity.ChallengeScope;
 import org.example.challenge.entity.ChallengeTag;
@@ -16,12 +17,13 @@ import java.time.LocalDate;
 import java.util.*;
 
 @Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChallengeCreateRequest {
 
     @NotNull
-    private ChallengeScope challengeScope; // PERSONAL or GROUP
+    private ChallengeScope challengeScope;
 
     private Long crewId;
 
@@ -29,6 +31,8 @@ public class ChallengeCreateRequest {
     private Long creatorId;
 
     private Set<ChallengeTag> challengeTags;
+
+    private Set<String> customTags;
 
     @NotNull
     private ChallengeType challengeType;
@@ -47,21 +51,21 @@ public class ChallengeCreateRequest {
 
     public Challenge toEntity(Crew crew, User creator) {
         validateScopeGroupConsistency(challengeScope, crew != null);
-        return new Challenge(
-                null,
-                challengeScope,
-                crew,      // null 가능
-                creator,    // null 가능
-                challengeTags,
-                challengeType,
-                challengeName,
-                challengeDescription,
-                challengeStartDate,
-                challengeEndDate,
-                challengeBetAmount,
-                0,
-                0
-        );
+        return Challenge.builder()
+                .challengeScope(challengeScope)
+                .crew(crew)
+                .creator(creator)
+                .tags(challengeTags == null ? Set.of() : challengeTags)
+                .customTags(customTags == null ? Set.of() : customTags)
+                .challengeType(challengeType)
+                .challengeName(challengeName)
+                .challengeDescription(challengeDescription)
+                .challengeStartDate(challengeStartDate)
+                .challengeEndDate(challengeEndDate)
+                .challengeBetAmount(challengeBetAmount)
+                .challengeLikeCnt(0)
+                .challengeParticipantCnt(0)
+                .build();
     }
 
     private static void validateScopeGroupConsistency(ChallengeScope scope, boolean hasGroup) {

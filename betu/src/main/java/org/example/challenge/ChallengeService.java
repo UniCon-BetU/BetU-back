@@ -8,17 +8,21 @@ import org.example.challenge.entity.*;
 import org.example.challenge.repository.ChallengeLikeRepository;
 import org.example.challenge.repository.ChallengeRepository;
 import org.example.challenge.repository.UserChallengeRepository;
+import org.example.challenge.repository.ChallengeImageRepository;
 import org.example.crew.entity.Crew;
 import org.example.crew.entity.UserCrew;
 import org.example.crew.entity.UserCrewRole;
 import org.example.crew.repository.CrewRepository;
 import org.example.crew.repository.UserCrewRepository;
+import org.example.general.S3Uploader;
 import org.example.verification_image.VerificationImageRepository;
 import org.example.user.User;
 import org.example.user.UserRepository;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,9 +39,12 @@ public class ChallengeService {
     private final UserRepository userRepository;
     private final UserCrewRepository userCrewRepository;
     private final ChallengeLikeRepository challengeLikeRepository;
+    private final ChallengeImageRepository challengeImageRepository;
+
+    private final S3Uploader s3Uploader;
 
     // 챌린지 생성
-    public ChallengeDetailResponse create(Long userId, ChallengeCreateRequest dto) {
+    public ChallengeDetailResponse create(Long userId, ChallengeCreateRequest dto, List<MultipartFile> images) throws IOException {
         // 1) 작성자(creator) = 토큰 사용자
         User creator = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
@@ -70,7 +77,25 @@ public class ChallengeService {
 
         userChallengeRepository.save(new UserChallenge(creator, saved, UserChallengeRole.CREATOR));
 
-        return toDetailResponse(saved, false, 0);
+        if (images != null && !images.isEmpty()) {
+            int order = 0;
+            for (MultipartFile file : images) {
+                Long crewIdValue = (crew != null) ? crew.getCrewId() : 0L;
+                String prefix = String.format("crew/%d/challenge/%d", crewIdValue, saved.getChallengeId());
+                String url = s3Uploader.uploadImageUnderPrefix(file, prefix);
+
+                ChallengeImage pi = ChallengeImage.builder()
+                        .challenge(saved)
+                        .imageUrl(url)
+                        .sortOrder(order)
+                        .isThumbnail(order == 0)
+                        .build();
+                challengeImageRepository.save(pi);
+                order++;
+            }
+        }
+
+        return toDetailResponse(saved, false, 0, false);
     }
 
     // 챌린지 좋아요
@@ -117,12 +142,14 @@ public class ChallengeService {
                 .orElseThrow(() -> new EntityNotFoundException("해당 챌린지를 찾을 수 없습니다."));
         Optional<UserChallenge> userChallengeOpt = userChallengeRepository
                 .findByUser_UserIdAndChallenge_ChallengeId(userId, challengeId);
+        boolean liked = challengeLikeRepository
+                .existsByUserIdAndChallengeId(userId, challengeId);
 
         if (userChallengeOpt.isPresent()) {
             UserChallenge uc = userChallengeOpt.get();
-            return toDetailResponse(ch, true, uc.getProgressPercent());
+            return toDetailResponse(ch, true, uc.getProgressPercent(), liked);
         } else {
-            return toDetailResponse(ch, false, 0);
+            return toDetailResponse(ch, false, 0, liked);
         }
     }
 
@@ -156,8 +183,8 @@ public class ChallengeService {
 
         // 4) 베팅 금액 기록 + 상태 전환
         UserChallengeStatus prev = uc.getUserChallengeStatus();
-        uc.makeBetAmount(betAmountRequest.getBetAmount());                             // ✅ 베팅 포인트 기록
-        uc.changeStatus(UserChallengeStatus.IN_PROGRESS);       // ✅ 참가 시작
+        uc.makeBetAmount(betAmountRequest.getBetAmount());
+        uc.changeStatus(UserChallengeStatus.IN_PROGRESS);
         userChallengeRepository.save(uc);
 
         // 5) 참가자 수 증가 규칙
@@ -166,7 +193,10 @@ public class ChallengeService {
             challengeRepository.save(challenge);
         }
 
-        return toDetailResponse(challenge, true, 0);
+        boolean liked = challengeLikeRepository
+                .existsByUserIdAndChallengeId(userId, challengeId);
+
+        return toDetailResponse(challenge, true, 0, liked);
     }
 
     /** 성공 정산: 스테이크 전액 환급 + 랜덤 보너스, 상태 COMPLETED */
@@ -282,10 +312,16 @@ public class ChallengeService {
     }
 
     private ChallengeResponse toResponse(Challenge c) {
+        String thumbnailUrl = challengeImageRepository
+                .findTopByChallenge_ChallengeIdOrderBySortOrderAsc(c.getChallengeId())
+                .map(ChallengeImage::getImageUrl)
+                .orElse(null);
         return new ChallengeResponse(
                 c.getChallengeId(),
                 c.getChallengeScope(),
                 c.getCrew(),
+                c.getTags(),
+                c.getCustomTags(),
                 c.getChallengeType(),
                 c.getChallengeName(),
                 c.getChallengeDescription(),
@@ -293,16 +329,23 @@ public class ChallengeService {
                 c.getChallengeEndDate(),
                 c.getChallengeBetAmount(),
                 c.getChallengeLikeCnt(),
-                c.getChallengeParticipantCnt()
+                c.getChallengeParticipantCnt(),
+                thumbnailUrl
         );
     }
 
-    private ChallengeDetailResponse toDetailResponse(Challenge c, boolean isParticipating, int progress) {
+    private ChallengeDetailResponse toDetailResponse(Challenge c, boolean isParticipating, int progress, boolean liked) {
+        List<String> imageUrls = challengeImageRepository
+                .findByChallenge_ChallengeIdOrderBySortOrderAsc(c.getChallengeId())
+                .stream()
+                .map(ChallengeImage::getImageUrl)
+                .toList();
         return new ChallengeDetailResponse(
                 c.getChallengeId(),
                 c.getChallengeScope(),
                 c.getCrew(),
                 c.getTags(),
+                c.getCustomTags(),
                 c.getChallengeType(),
                 c.getChallengeName(),
                 c.getChallengeDescription(),
@@ -312,7 +355,9 @@ public class ChallengeService {
                 c.getChallengeLikeCnt(),
                 c.getChallengeParticipantCnt(),
                 isParticipating,
-                progress
+                progress,
+                liked,
+                imageUrls
         );
     }
 }

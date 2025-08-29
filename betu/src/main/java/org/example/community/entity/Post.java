@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import org.example.crew.entity.Crew;
 import org.example.user.User;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @NoArgsConstructor
@@ -34,6 +36,9 @@ public class Post {
     @Column(nullable = false)
     private int postLikeCnt = 0;
 
+    private LocalDateTime postCreatedAt;
+
     public void increaseLike() { this.postLikeCnt++; }
     public void decreaseLike() { if (this.postLikeCnt > 0) this.postLikeCnt--; }
+
 }
