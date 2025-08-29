@@ -45,7 +45,6 @@ public class ChallengeCreateRequest {
 
     private int challengeDuration;
 
-    private int challengeBetAmount;
 
     public Challenge toEntity(Crew crew, User creator) {
         validateScopeGroupConsistency(challengeScope, crew != null);
