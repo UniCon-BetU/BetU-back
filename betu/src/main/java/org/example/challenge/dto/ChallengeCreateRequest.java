@@ -43,11 +43,8 @@ public class ChallengeCreateRequest {
     @NotBlank
     private String challengeDescription;
 
-    private LocalDate challengeStartDate;
+    private int challengeDuration;
 
-    private LocalDate challengeEndDate;
-
-    private int challengeBetAmount;
 
     public Challenge toEntity(Crew crew, User creator) {
         validateScopeGroupConsistency(challengeScope, crew != null);
@@ -60,9 +57,7 @@ public class ChallengeCreateRequest {
                 .challengeType(challengeType)
                 .challengeName(challengeName)
                 .challengeDescription(challengeDescription)
-                .challengeStartDate(challengeStartDate)
-                .challengeEndDate(challengeEndDate)
-                .challengeBetAmount(challengeBetAmount)
+                .challengeDuration(challengeDuration)
                 .challengeLikeCnt(0)
                 .challengeParticipantCnt(0)
                 .build();

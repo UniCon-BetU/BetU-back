@@ -22,9 +22,7 @@ public class ChallengeResponse {
     private ChallengeType challengeType;
     private String challengeName;
     private String challengeDescription;
-    private LocalDate challengeStartDate;
-    private LocalDate challengeEndDate;
-    private int challengeBetAmount;
+    private int challengeDuration;
     private long favoriteCount;
     private long participantCount;
     private String imageUrl;
