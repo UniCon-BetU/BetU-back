@@ -4,17 +4,23 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.challenge.dto.*;
 import org.example.challenge.entity.ChallengeTag;
 import org.example.user.UserService;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/challenges")
@@ -22,14 +28,16 @@ public class ChallengeController {
     private final UserService userService;
     private final ChallengeService challengeService;
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "챌린지 생성")
     public ResponseEntity<ChallengeDetailResponse> createChallenge(
             HttpServletRequest request,
-            @Valid @RequestBody ChallengeCreateRequest dto
-    ) {
+            @ParameterObject @ModelAttribute ChallengeCreateRequest dto,
+            @RequestPart(name = "images", required = false) List<MultipartFile> images
+    ) throws IOException {
         Long userId = userService.getUserIdFromToken(request);
-        return ResponseEntity.ok(challengeService.create(userId, dto));
+        log.info("scope={}, type={}, name={}", dto.getChallengeScope(), dto.getChallengeType(), dto.getChallengeName());
+        return ResponseEntity.ok(challengeService.create(userId, dto, images));
     }
 
     @GetMapping("/{challengeId}")
