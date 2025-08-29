@@ -2,6 +2,7 @@ package org.example.challenge.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.challenge.dto.ChallengeCreateRequest;
@@ -16,6 +17,7 @@ import java.util.Set;
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Challenge {
 
     @Id
@@ -40,6 +42,12 @@ public class Challenge {
     @Column(name = "tag", nullable = false, length = 50)
     @Enumerated(EnumType.STRING)
     private Set<ChallengeTag> tags = new HashSet<>();
+
+    @ElementCollection
+    @CollectionTable(name = "challenge_custom_tags",
+            joinColumns = @JoinColumn(name = "challenge_id"))
+    @Column(name = "custom_tag", nullable = false, length = 50)
+    private Set<String> customTags = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
     private ChallengeType challengeType;
