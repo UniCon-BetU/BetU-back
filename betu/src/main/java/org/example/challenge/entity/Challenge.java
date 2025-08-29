@@ -54,9 +54,7 @@ public class Challenge {
 
     private String challengeName;
     private String challengeDescription;
-    private LocalDate challengeStartDate;
-    private LocalDate challengeEndDate;
-    private int challengeBetAmount;
+    private int challengeDuration;
     private int challengeLikeCnt;
     private int challengeParticipantCnt;
 
@@ -72,12 +70,6 @@ public class Challenge {
 
     public void increaseParticipantCount() {
         this.challengeParticipantCnt++;
-    }
-    public long getDurationDays() {
-        if (challengeStartDate == null || challengeEndDate == null) {
-            return 0;
-        }
-        return java.time.temporal.ChronoUnit.DAYS.between(challengeStartDate, challengeEndDate) + 1;
     }
 
 }
