@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -49,7 +50,8 @@ public class CommunityService {
                     .orElseThrow(() -> new EntityNotFoundException("그룹 없음"));
         }
 
-        Post post = new Post(null, crew, author, req.getTitle(), req.getContent(), 0);
+        LocalDateTime now = LocalDateTime.now();
+        Post post = new Post(null, crew, author, req.getTitle(), req.getContent(), 0, now);
         Post saved = postRepository.save(post);
 
         // 이미지 업로드
@@ -82,7 +84,7 @@ public class CommunityService {
             throw new SecurityException("수정 권한이 없습니다.");
         }
 
-        Post updated = new Post(post.getPostId(), post.getCrew(), post.getUser(), req.getTitle(), req.getContent(), 0);
+        Post updated = new Post(post.getPostId(), post.getCrew(), post.getUser(), req.getTitle(), req.getContent(), 0, post.getPostCreatedAt());
         postRepository.save(updated);
     }
 
