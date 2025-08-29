@@ -43,9 +43,7 @@ public class ChallengeCreateRequest {
     @NotBlank
     private String challengeDescription;
 
-    private LocalDate challengeStartDate;
-
-    private LocalDate challengeEndDate;
+    private int challengeDuration;
 
     private int challengeBetAmount;
 
@@ -60,9 +58,7 @@ public class ChallengeCreateRequest {
                 .challengeType(challengeType)
                 .challengeName(challengeName)
                 .challengeDescription(challengeDescription)
-                .challengeStartDate(challengeStartDate)
-                .challengeEndDate(challengeEndDate)
-                .challengeBetAmount(challengeBetAmount)
+                .challengeDuration(challengeDuration)
                 .challengeLikeCnt(0)
                 .challengeParticipantCnt(0)
                 .build();

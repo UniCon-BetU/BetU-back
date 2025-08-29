@@ -47,7 +47,7 @@ public class UserChallenge {
     }
 
     public int getProgressPercent() {
-        long durationDays = challenge.getDurationDays(); // (끝-시작)+1 기준
+        long durationDays = challenge.getChallengeDuration();
         if (durationDays <= 0) return 0;
         long capped = Math.min(progressDay, durationDays); // 과다 카운트 방지
         int pct = (int) Math.floor((capped * 100.0) / durationDays);
