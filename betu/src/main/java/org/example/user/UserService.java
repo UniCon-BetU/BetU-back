@@ -69,11 +69,11 @@ public class UserService {
     }
 
     public void login(UserLogInRequestDto requestDto, HttpServletResponse response) {
-        User user = userRepository.findByUserName(requestDto.getUserName())
-                .orElseThrow(() -> new RuntimeException("아이디 또는 비밀번호가 일치하지 않습니다."));
+        User user = userRepository.findByUserEmail(requestDto.getUserEmail())
+                .orElseThrow(() -> new RuntimeException("이메일 또는 비밀번호가 일치하지 않습니다."));
 
         if (!passwordEncoder.matches(requestDto.getUserPassword(), user.getUserPassword())) {
-            throw new RuntimeException("아이디 또는 비밀번호가 일치하지 않습니다.");
+            throw new RuntimeException("이메일 또는 비밀번호가 일치하지 않습니다.");
         }
 
         String accessToken = jwtProvider.createAccessToken(user.getUserName(), user.getUserId());
