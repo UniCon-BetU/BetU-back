@@ -76,4 +76,8 @@ public class User {
         }
         this.point = newPoint;
     }
+
+    public void updateUserName(String userName) {
+        this.userName = userName;
+    }
 }

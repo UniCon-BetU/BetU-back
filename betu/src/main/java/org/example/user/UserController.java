@@ -1,9 +1,8 @@
 package org.example.user;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.example.user.dto.ChangePasswordRequestDto;
-import org.example.user.dto.UserLogInRequestDto;
-import org.example.user.dto.UserSignUpRequestDto;
+import org.example.user.dto.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -24,16 +23,27 @@ public class UserController {
 
     private final UserService userService;
 
-    @Operation(summary = "회원가입")
+    @Operation(summary = "회원가입 1단계")
     @SecurityRequirement(name = "")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "회원가입 성공"),
-            @ApiResponse(responseCode = "400", description = "회원가입 실패 (아이디/이메일 중복)")
-    })
-    @PostMapping("/signup")
-    public String signup(@RequestBody UserSignUpRequestDto requestDto, HttpServletResponse response) {
-        userService.signUp(requestDto, response);
-        return "회원가입 성공!";
+    @PostMapping(value = "/signup/step1", consumes = "application/json")
+    public ResponseEntity<Void> signUpStep1(
+            @RequestBody UserSignUpStep1Request requestDto,
+            HttpServletResponse response
+    ) {
+        userService.signUpStep1(requestDto, response);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    }
+
+    @Operation(summary = "회원가입 2단계")
+    @SecurityRequirement(name = "")
+    @PostMapping(value = "/signup/step2", consumes = "application/json")
+    public ResponseEntity<Void> completeSignUp(
+            HttpServletRequest request,
+            @RequestBody UserSignUpStep2Request requestDto
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+        userService.completeSignUp(userId, requestDto);
+        return ResponseEntity.ok().build();
     }
 
     @Operation(summary = "로그인")

@@ -42,19 +42,19 @@ public class JwtProvider {
 
     private static final String ACCESS_TOKEN_SUBJECT = "AccessToken";
     private static final String REFRESH_TOKEN_SUBJECT = "RefreshToken";
-    private static final String LOGIN_ID_CLAIM = "loginId";
+    private static final String USER_EMAIL_CLAIM = "userEmail";
     private static final String BEARER = "Bearer ";
     private static final String USER_ID_CLAIM = "userId";
 
     private final UserRepository userRepository;
 
     // accessToken 생성
-    public String createAccessToken(String userName, Long userId) {
+    public String createAccessToken(String userEmail, Long userId) {
         Date now = new Date();
         return JWT.create()
                 .withSubject(ACCESS_TOKEN_SUBJECT)
                 .withExpiresAt(new Date(now.getTime() + accessTokenExpirationPeriod))
-                .withClaim(LOGIN_ID_CLAIM, userName)
+                .withClaim(USER_EMAIL_CLAIM, userEmail)
                 .withClaim(USER_ID_CLAIM, userId)
                 .sign(Algorithm.HMAC512(secretKey));
     }
@@ -106,7 +106,7 @@ public class JwtProvider {
             return Optional.ofNullable(JWT.require(Algorithm.HMAC512(secretKey))
                     .build()
                     .verify(accessToken)
-                    .getClaim(LOGIN_ID_CLAIM)
+                    .getClaim(USER_EMAIL_CLAIM)
                     .asString());
         } catch (Exception e) {
             log.error("액세스 토큰이 유효하지 않습니다.as");

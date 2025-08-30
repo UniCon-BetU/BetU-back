@@ -6,9 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.example.general.jwt.JwtProvider;
-import org.example.user.dto.ChangePasswordRequestDto;
-import org.example.user.dto.UserLogInRequestDto;
-import org.example.user.dto.UserSignUpRequestDto;
+import org.example.user.dto.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,33 +26,46 @@ public class UserService {
         return jwtProvider.extractUserId(accessToken).orElseThrow(() -> new RuntimeException("토큰에서 유저 아이디를 찾을 수 없습니다."));
     }
 
-    public void signUp(UserSignUpRequestDto requestDto, HttpServletResponse response) {
-        // 아이디 중복 체크
-        if (userRepository.findByUserName(requestDto.getUserName()).isPresent()) {
-            throw new RuntimeException("이미 존재하는 아이디입니다.");
-        }
-
+    @Transactional
+    public void signUpStep1(UserSignUpStep1Request requestDto, HttpServletResponse response) {
         // 이메일 중복 체크
         if (userRepository.findByUserEmail(requestDto.getUserEmail()).isPresent()) {
             throw new RuntimeException("이미 존재하는 이메일입니다.");
         }
 
-        // 저장
+        // userName은 null 상태로 가입
         User user = User.builder()
-                .userName(requestDto.getUserName())
-                .userPassword(passwordEncoder.encode(requestDto.getUserPassword())) // 비밀번호 암호화
                 .userEmail(requestDto.getUserEmail())
+                .userPassword(passwordEncoder.encode(requestDto.getUserPassword()))
+                .emailVerified(false) // 이메일 인증 아직 안됨
                 .build();
 
         userRepository.save(user);
 
-        // 가입하자마자 로그인 토큰 발급
-        String accessToken = jwtProvider.createAccessToken(user.getUserName(), user.getUserId());
+        // 로그인 토큰 발급 (userName 없음)
+        String accessToken = jwtProvider.createAccessToken(user.getUserEmail(), user.getUserId());
         String refreshToken = jwtProvider.createRefreshToken();
         jwtProvider.sendAccessAndRefreshToken(response, accessToken, refreshToken);
 
         user.updateRefreshToken(refreshToken);
         userRepository.save(user);
+    }
+
+    @Transactional
+    public void completeSignUp(Long userId, UserSignUpStep2Request requestDto) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        if (user.getUserName() != null) {
+            throw new IllegalStateException("이미 userName이 등록된 계정입니다.");
+        }
+
+        // 아이디 중복 체크
+        if (userRepository.findByUserName(requestDto.getUserName()).isPresent()) {
+            throw new RuntimeException("이미 존재하는 아이디입니다.");
+        }
+
+        user.updateUserName(requestDto.getUserName());
     }
 
     public void login(UserLogInRequestDto requestDto, HttpServletResponse response) {
