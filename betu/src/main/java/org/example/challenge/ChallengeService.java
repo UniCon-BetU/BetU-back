@@ -15,6 +15,7 @@ import org.example.crew.entity.UserCrewRole;
 import org.example.crew.repository.CrewRepository;
 import org.example.crew.repository.UserCrewRepository;
 import org.example.general.S3Uploader;
+import org.example.user.UserRole;
 import org.example.verification_image.VerificationImageRepository;
 import org.example.user.User;
 import org.example.user.UserRepository;
@@ -49,30 +50,51 @@ public class ChallengeService {
         User creator = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
+        UserRole role = creator.getRole(); // getUserRole()/getRole() 프로젝트에 맞게
+        ChallengeScope requested = dto.getChallengeScope();
+        if (requested == null) throw new IllegalArgumentException("challengeScope는 필수입니다.");
+
+        // 2) 역할에 따른 스코프 강제/검증
+        ChallengeScope finalScope;
         Crew crew = null;
-        // GROUP 스코프일 때만 그룹/멤버십/소유자 검증
-        if (dto.getChallengeScope() == ChallengeScope.CREW) {
-            if (dto.getCrewId() == null) {
-                throw new IllegalArgumentException("GROUP 스코프의 챌린지는 crewId가 필요합니다.");
+
+        if (role == UserRole.ADMIN) {
+            // 관리자 → 무조건 BETU, crew 금지
+            finalScope = ChallengeScope.BETU;
+            if (dto.getCrewId() != null) {
+                throw new IllegalArgumentException("BETU 스코프에서는 crewId를 사용할 수 없습니다.");
             }
+        } else {
+            // 일반 사용자 → BETU 금지, CREW/PUBLIC만 허용
+            if (requested == ChallengeScope.BETU) {
+                throw new AccessDeniedException("일반 사용자는 BETU 스코프 챌린지를 생성할 수 없습니다.");
+            }
+            finalScope = requested;
 
-            crew = crewRepository.findById(dto.getCrewId())
-                    .orElseThrow(() -> new RuntimeException("그룹을 찾을 수 없습니다."));
+            if (finalScope == ChallengeScope.CREW) {
+                // CREW: crewId 필수 + OWNER만 생성 가능
+                if (dto.getCrewId() == null) {
+                    throw new IllegalArgumentException("CREW 스코프의 챌린지는 crewId가 필요합니다.");
+                }
+                crew = crewRepository.findById(dto.getCrewId())
+                        .orElseThrow(() -> new RuntimeException("그룹을 찾을 수 없습니다."));
 
-            // 멤버십 체크
-            UserCrew userCrew = userCrewRepository
-                    // 연관관계 매핑이라면 ↓ 이렇게 써야 함: findByUser_UserIdAndGroup_GroupId
-                    .findByUser_UserIdAndCrew_CrewId(userId, dto.getCrewId())
-                    .orElseThrow(() -> new RuntimeException("해당 그룹에 속해있지 않습니다."));
-
-            // 소유자 체크
-            if (userCrew.getUserCrewRole() != UserCrewRole.OWNER) {
-                throw new AccessDeniedException("그룹 소유자만 CREW 스코프 챌린지를 생성할 수 있습니다.");
+                UserCrew userCrew = userCrewRepository
+                        .findByUser_UserIdAndCrew_CrewId(userId, dto.getCrewId())
+                        .orElseThrow(() -> new RuntimeException("해당 그룹에 속해있지 않습니다."));
+                if (userCrew.getUserCrewRole() != UserCrewRole.OWNER) {
+                    throw new AccessDeniedException("그룹 소유자만 CREW 스코프 챌린지를 생성할 수 있습니다.");
+                }
+            } else { // PUBLIC
+                if (dto.getCrewId() != null) {
+                    throw new IllegalArgumentException("PUBLIC 스코프는 crewId를 가질 수 없습니다.");
+                }
             }
         }
 
+
         // PERSONAL이면 group == null 유지
-        Challenge challenge = dto.toEntity(crew, creator);
+        Challenge challenge = dto.toEntity(crew, creator, finalScope);
         Challenge saved = challengeRepository.save(challenge);
 
         userChallengeRepository.save(new UserChallenge(creator, saved, UserChallengeRole.CREATOR));

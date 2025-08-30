@@ -46,10 +46,10 @@ public class ChallengeCreateRequest {
     private int challengeDuration;
 
 
-    public Challenge toEntity(Crew crew, User creator) {
+    public Challenge toEntity(Crew crew, User creator, ChallengeScope finalScope) {
         validateScopeGroupConsistency(challengeScope, crew != null);
         return Challenge.builder()
-                .challengeScope(challengeScope)
+                .challengeScope(finalScope)
                 .crew(crew)
                 .creator(creator)
                 .tags(challengeTags == null ? Set.of() : challengeTags)

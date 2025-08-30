@@ -79,7 +79,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         log.info("리프레시토큰이 유효하나 DB에 있는지는 모름. DB에서 찾아봐서 없으면 예외 발생할 것임.");
         User user = userRepository.findByRefreshToken(refreshToken)
                 .orElseThrow(() -> new JWTVerificationException("유효하지 않은 리프레시 토큰입니다."));
-        jwtProvider.sendAccessToken(response, jwtProvider.createAccessToken(user.getUserName(), user.getUserId()));
+        jwtProvider.sendAccessToken(response, jwtProvider.createAccessToken(user.getUserEmail(), user.getUserId()));
     }
 
     public void checkAccessTokenAndAuthentication(HttpServletRequest request, HttpServletResponse response,

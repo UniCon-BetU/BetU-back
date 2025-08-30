@@ -1,3 +1,3 @@
 package org.example.challenge.entity;
 
-public enum ChallengeScope { CREW, PUBLIC }
+public enum ChallengeScope { CREW, PUBLIC, BETU }

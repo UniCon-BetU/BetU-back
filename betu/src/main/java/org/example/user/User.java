@@ -32,6 +32,13 @@ public class User {
     @Column(nullable = false)
     private UserRole role = UserRole.USER;
 
+    @Column(nullable = false)
+    private boolean emailVerified = false;
+
+    public void isEmailVerified() {
+        this.emailVerified = true;
+    }
+
     public void makeAdmin() { this.role = UserRole.ADMIN; }
 
     public boolean isAdmin() {
@@ -68,5 +75,9 @@ public class User {
             throw new IllegalArgumentException("포인트는 음수가 될 수 없습니다.");
         }
         this.point = newPoint;
+    }
+
+    public void updateUserName(String userName) {
+        this.userName = userName;
     }
 }
