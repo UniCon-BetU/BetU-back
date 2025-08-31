@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.challenge.dto.*;
+import org.example.challenge.entity.ChallengeScope;
 import org.example.challenge.entity.ChallengeTag;
 import org.example.user.UserService;
 import org.springdoc.core.annotations.ParameterObject;
@@ -71,6 +72,15 @@ public class ChallengeController {
         return ResponseEntity.ok(
                 challengeService.challengeLike(userId, challengeId)
         );
+    }
+
+    @GetMapping("/scope/{scope}")
+    public ResponseEntity<List<ChallengeResponse>> getChallengesByScope(
+            @PathVariable("scope") ChallengeScope scope,
+            @RequestParam(value = "crewId", required = false) Long crewId
+    ) {
+        List<ChallengeResponse> responses = challengeService.getChallengesByScope(scope, crewId);
+        return ResponseEntity.ok(responses);
     }
 
     @GetMapping("/popular")

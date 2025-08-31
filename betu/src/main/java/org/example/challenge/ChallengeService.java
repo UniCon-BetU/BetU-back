@@ -295,6 +295,29 @@ public class ChallengeService {
                 .toList();
     }
 
+    @Transactional
+    public List<ChallengeResponse> getChallengesByScope(ChallengeScope scope, Long crewId) {
+        if (scope == null) {
+            throw new IllegalArgumentException("scope는 필수입니다.");
+        }
+
+        List<Challenge> list;
+
+        if (scope == ChallengeScope.CREW) {
+            if (crewId == null) {
+                throw new IllegalArgumentException("CREW 스코프 조회에는 crewId가 필요합니다.");
+            }
+            list = challengeRepository.findCrewScopeByCrewIdWithCrew(crewId);
+        } else {
+            // BETU, PUBLIC, (있다면) PERSONAL 등
+            list = challengeRepository.findByScopeWithCrew(scope);
+        }
+
+        return list.stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     // 내 챌린지 조회
     public List<ChallengeResponse> getMyChallenges(Long userId) {
         List<UserChallenge> userChallenges = userChallengeRepository.findAllByUser_UserId(userId);
