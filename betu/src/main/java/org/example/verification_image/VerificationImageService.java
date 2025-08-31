@@ -20,6 +20,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -57,11 +59,104 @@ public class VerificationImageService {
     }
 
     @Transactional(readOnly = true)
+    public List<VerificationImageReviewResponse> getLatestPendingImages(Long challengeId, Long reviewerId) {
+        boolean isReviewerParticipating = userChallengeRepository
+                .existsByUser_UserIdAndChallenge_ChallengeIdAndUserChallengeStatus(
+                        reviewerId, challengeId, UserChallengeStatus.IN_PROGRESS
+                );
+
+        if (!isReviewerParticipating) {
+            throw new IllegalStateException("해당 챌린지에 참가 중이 아닙니다.");
+        }
+
+        List<VerificationImage> pendingImages =
+                verificationImageRepository.findTop3ByUserChallenge_Challenge_ChallengeIdAndVerificationStatusOrderByUploadedAtDesc(
+                        challengeId, VerificationStatus.PENDING
+                );
+
+        if (pendingImages.isEmpty()) {
+            throw new IllegalStateException("대기 중인 인증 이미지가 없습니다.");
+        }
+
+        return pendingImages
+                .stream()
+                .map(img -> new VerificationImageReviewResponse(
+                        img.getCertificationImageId(),
+                        img.getImageUrl(),
+                        img.getVerificationStatus()
+                ))
+                .toList();
+    }
+
+    @Transactional
+    public void reviewImages(Long challengeId, Long reviewerId, ReviewRequest req) {
+        boolean isReviewerParticipating = userChallengeRepository
+                .existsByUser_UserIdAndChallenge_ChallengeIdAndUserChallengeStatus(
+                        reviewerId, challengeId, UserChallengeStatus.IN_PROGRESS
+                );
+
+        if (!isReviewerParticipating) {
+            throw new IllegalStateException("현재 진행 중인 참가자가 아닙니다.");
+        }
+
+        if (req.getReviews() == null || req.getReviews().isEmpty()) {
+            throw new IllegalArgumentException("검토할 이미지가 없습니다.");
+        }
+
+        List<Long> imageIds = req.getReviews().stream()
+                .map(ReviewRequest.ReviewItem::getVerificationImageId)
+                .toList();
+
+        List<VerificationImage> images = verificationImageRepository.findAllById(imageIds);
+
+        Map<Long, Boolean> decisionMap = req.getReviews().stream()
+                .collect(Collectors.toMap(
+                        ReviewRequest.ReviewItem::getVerificationImageId,
+                        ReviewRequest.ReviewItem::isApproved
+                ));
+
+        for (VerificationImage img : images) {
+            if (!img.getUserChallenge().getChallenge().getChallengeId().equals(challengeId)) {
+                throw new IllegalStateException("해당 챌린지에 속하지 않는 이미지입니다: " + img.getCertificationImageId());
+            }
+
+            boolean approved = decisionMap.getOrDefault(img.getCertificationImageId(), false);
+            if (approved) {
+                img.markVerified();
+            } else {
+                img.revokeVerification();
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
     public List<VerificationImageResponse> getMyPendingImages(Long userId) {
         User me = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
 
         List<VerificationImage> all = verificationImageRepository.findAllByStatusWithChallengeAndCrew(VerificationStatus.PENDING);
+
+        List<VerificationImage> filtered;
+        if (me.isAdmin()) {
+            filtered = all;
+        } else {
+            filtered = all.stream()
+                    .filter(vi -> canModerate(me, vi))
+                    .toList();
+        }
+
+        // ✅ 여기서 DTO로 변환까지 처리
+        return filtered.stream()
+                .map(VerificationImageResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<VerificationImageResponse> getMyRejectedImages(Long userId) {
+        User me = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("사용자 없음"));
+
+        List<VerificationImage> all = verificationImageRepository.findAllByStatusWithChallengeAndCrew(VerificationStatus.REJECTED);
 
         List<VerificationImage> filtered;
         if (me.isAdmin()) {
