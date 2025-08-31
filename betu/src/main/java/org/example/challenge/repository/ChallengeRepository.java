@@ -48,4 +48,6 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
           and cr.crewId = :crewId
     """)
     List<Challenge> findCrewScopeByCrewIdWithCrew(@Param("crewId") Long crewId);
+
+    Long countByCrew_CrewId(Long crewId);
 }

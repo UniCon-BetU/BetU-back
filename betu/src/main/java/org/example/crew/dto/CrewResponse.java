@@ -4,13 +4,27 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.example.crew.entity.UserCrewRole;
 
+import java.util.List;
+
 @Getter
 @AllArgsConstructor
 public class CrewResponse {
     private Long crewId;
     private String crewName;
+    private String crewDescription;
+
     private String crewCode;
     private Boolean isPublic;
-    private UserCrewRole myRole; // 목록에 내 역할도 같이 주면 편함(전체 조회는 null 가능)
-}
 
+    private UserCrewRole myRole;
+
+    private Long ownerId;
+    private String ownerName;
+
+    private Long memberCount;
+    private Long challengeCount;
+
+    private List<String> imageUrls;
+
+    private List<String> customTags;
+}
