@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface VerificationImageRepository extends JpaRepository<VerificationImage, Long> {
@@ -21,4 +22,7 @@ public interface VerificationImageRepository extends JpaRepository<VerificationI
     List<VerificationImage> findAllByStatusWithChallengeAndCrew(@Param("status") VerificationStatus status);
 
     List<VerificationImage> findTop3ByUserChallenge_Challenge_ChallengeIdAndVerificationStatusOrderByUploadedAtDesc(Long challengeId, VerificationStatus verificationStatus);
+
+    boolean existsByUserChallenge_User_UserIdAndUserChallenge_Challenge_ChallengeIdAndUploadedAtBetween(
+            Long userId, Long challengeId, LocalDateTime startOfDay, LocalDateTime endOfDay);
 }
