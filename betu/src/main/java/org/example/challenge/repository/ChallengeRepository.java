@@ -1,6 +1,7 @@
 package org.example.challenge.repository;
 
 import org.example.challenge.entity.Challenge;
+import org.example.challenge.entity.ChallengeScope;
 import org.example.challenge.entity.ChallengeTag;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,4 +31,21 @@ public interface ChallengeRepository extends JpaRepository<Challenge, Long> {
 
     @Query("select distinct c from Challenge c left join fetch c.crew where lower(c.challengeName) like lower(concat('%', :kw, '%')) or lower(c.challengeDescription) like lower(concat('%', :kw, '%'))")
     List<Challenge> searchWithCrew(@Param("kw") String keyword);
+
+    @Query("""
+        select c
+        from Challenge c
+        left join fetch c.crew
+        where c.challengeScope = :scope
+    """)
+    List<Challenge> findByScopeWithCrew(@Param("scope") ChallengeScope scope);
+
+    @Query("""
+        select c
+        from Challenge c
+        join fetch c.crew cr
+        where c.challengeScope = org.example.challenge.entity.ChallengeScope.CREW
+          and cr.crewId = :crewId
+    """)
+    List<Challenge> findCrewScopeByCrewIdWithCrew(@Param("crewId") Long crewId);
 }
