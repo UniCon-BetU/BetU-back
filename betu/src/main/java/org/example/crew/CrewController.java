@@ -9,10 +9,14 @@ import org.example.crew.dto.CrewJoinRequest;
 import org.example.crew.dto.CrewRankingResponse;
 import org.example.crew.dto.CrewResponse;
 import org.example.user.UserService;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -23,14 +27,15 @@ public class CrewController {
     private final CrewService crewService;
     private final UserService userService;
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "그룹 생성")
     public ResponseEntity<CrewResponse> createCrew(
             HttpServletRequest request,
-            @Valid @RequestBody CrewCreateRequest req
-    ) {
+            @ParameterObject @ModelAttribute CrewCreateRequest req,
+            @RequestPart(name = "images", required = false) List<MultipartFile> images
+    ) throws IOException {
         Long userId = userService.getUserIdFromToken(request);
-        return ResponseEntity.ok(crewService.createCrew(userId, req));
+        return ResponseEntity.ok(crewService.createCrew(userId, req, images));
     }
 
     @PostMapping("/join")
@@ -78,5 +83,15 @@ public class CrewController {
     @Operation(summary = "크루 내 랭킹", description = "크루에서 챌린지를 가장 많이 한 사람 순으로 반환")
     public ResponseEntity<List<CrewRankingResponse>> getCrewRanking(@PathVariable Long crewId) {
         return ResponseEntity.ok(crewService.getCrewRanking(crewId));
+    }
+
+    // 특정 그룹 상세 조회
+    @GetMapping("/{crewId}/me")
+    public ResponseEntity<CrewResponse> getCrewWithMyRole(
+            HttpServletRequest request,
+            @PathVariable Long crewId
+    ) {
+        Long userId = userService.getUserIdFromToken(request);
+        return ResponseEntity.ok(crewService.getCrewById(userId, crewId));
     }
 }
