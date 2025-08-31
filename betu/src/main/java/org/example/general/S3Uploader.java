@@ -42,4 +42,6 @@ public class S3Uploader {
         return String.format("https://%s.s3.%s.amazonaws.com/%s",
                 bucketName, region, key);
     }
+
+
 }
