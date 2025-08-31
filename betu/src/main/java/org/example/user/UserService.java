@@ -76,7 +76,7 @@ public class UserService {
             throw new RuntimeException("이메일 또는 비밀번호가 일치하지 않습니다.");
         }
 
-        String accessToken = jwtProvider.createAccessToken(user.getUserName(), user.getUserId());
+        String accessToken = jwtProvider.createAccessToken(user.getUserEmail(), user.getUserId());
         String refreshToken = jwtProvider.createRefreshToken();
         jwtProvider.sendAccessAndRefreshToken(response, accessToken, refreshToken);
 
