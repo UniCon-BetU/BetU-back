@@ -32,5 +32,6 @@ public class ChallengeDetailResponse {
     private boolean liked;
 
     private List<String> imageUrls;
+    private boolean todayVerified;
 
 }
