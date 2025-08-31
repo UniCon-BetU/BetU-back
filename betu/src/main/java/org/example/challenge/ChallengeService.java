@@ -24,6 +24,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -117,7 +119,7 @@ public class ChallengeService {
             }
         }
 
-        return toDetailResponse(saved, false, 0, false);
+        return toDetailResponse(saved, false, 0, false, false);
     }
 
     // 챌린지 좋아요
@@ -167,11 +169,18 @@ public class ChallengeService {
         boolean liked = challengeLikeRepository
                 .existsByUserIdAndChallengeId(userId, challengeId);
 
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
+
+        boolean todayVerified = verificationImageRepository
+                .existsByUserChallenge_User_UserIdAndUserChallenge_Challenge_ChallengeIdAndUploadedAtBetween(
+                        userId, challengeId, startOfDay, endOfDay);
+
         if (userChallengeOpt.isPresent()) {
             UserChallenge uc = userChallengeOpt.get();
-            return toDetailResponse(ch, true, uc.getProgressPercent(), liked);
+            return toDetailResponse(ch, true, uc.getProgressPercent(), liked, todayVerified);
         } else {
-            return toDetailResponse(ch, false, 0, liked);
+            return toDetailResponse(ch, false, 0, liked, todayVerified);
         }
     }
 
@@ -218,7 +227,7 @@ public class ChallengeService {
         boolean liked = challengeLikeRepository
                 .existsByUserIdAndChallengeId(userId, challengeId);
 
-        return toDetailResponse(challenge, true, 0, liked);
+        return toDetailResponse(challenge, true, 0, liked, false);
     }
 
     /** 성공 정산: 스테이크 전액 환급 + 랜덤 보너스, 상태 COMPLETED */
@@ -377,7 +386,7 @@ public class ChallengeService {
         );
     }
 
-    private ChallengeDetailResponse toDetailResponse(Challenge c, boolean isParticipating, int progress, boolean liked) {
+    private ChallengeDetailResponse toDetailResponse(Challenge c, boolean isParticipating, int progress, boolean liked, boolean todayVerified) {
         List<String> imageUrls = challengeImageRepository
                 .findByChallenge_ChallengeIdOrderBySortOrderAsc(c.getChallengeId())
                 .stream()
@@ -398,7 +407,8 @@ public class ChallengeService {
                 isParticipating,
                 progress,
                 liked,
-                imageUrls
+                imageUrls,
+                todayVerified
         );
     }
 }
