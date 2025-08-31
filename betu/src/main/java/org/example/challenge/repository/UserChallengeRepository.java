@@ -28,4 +28,5 @@ public interface UserChallengeRepository extends JpaRepository<UserChallenge, Lo
     """)
     List<Object[]> findUserRankingByCrew(Long crewId);
 
+    boolean existsByUser_UserIdAndChallenge_ChallengeIdAndUserChallengeStatus(Long reviewerId, Long challengeId, UserChallengeStatus userChallengeStatus);
 }

@@ -19,4 +19,6 @@ public interface VerificationImageRepository extends JpaRepository<VerificationI
          order by vi.uploadedAt asc
     """)
     List<VerificationImage> findAllByStatusWithChallengeAndCrew(@Param("status") VerificationStatus status);
+
+    List<VerificationImage> findTop3ByUserChallenge_Challenge_ChallengeIdAndVerificationStatusOrderByUploadedAtDesc(Long challengeId, VerificationStatus verificationStatus);
 }

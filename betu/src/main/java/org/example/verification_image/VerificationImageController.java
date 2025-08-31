@@ -2,7 +2,6 @@ package org.example.verification_image;
 
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.user.UserService;
 import org.springframework.http.MediaType;
@@ -33,11 +32,39 @@ public class VerificationImageController {
         return ResponseEntity.ok(id);
     }
 
+    @GetMapping("/{challengeId}/pending")
+    public ResponseEntity<List<VerificationImageReviewResponse>> getLatestPending(
+            HttpServletRequest request,
+            @PathVariable Long challengeId
+    ) {
+        Long reviewerId = userService.getUserIdFromToken(request);
+        return ResponseEntity.ok(verificationImageService.getLatestPendingImages(challengeId, reviewerId));
+    }
+
+    @PostMapping("/{challengeId}/review")
+    public ResponseEntity<Void> reviewLatestPending(
+            HttpServletRequest request,
+            @PathVariable Long challengeId,
+            @RequestBody ReviewRequest req
+    ) {
+        Long reviewerId = userService.getUserIdFromToken(request);
+        verificationImageService.reviewImages(challengeId, reviewerId, req);
+        return ResponseEntity.ok().build();
+    }
+
+
     @GetMapping("/pending")
     @Operation(summary = "내가 처리 가능한 인증 대기 목록 조회(관리자/크루오너)")
     public ResponseEntity<List<VerificationImageResponse>> pending(HttpServletRequest request) {
         Long me = userService.getUserIdFromToken(request);
         return ResponseEntity.ok(verificationImageService.getMyPendingImages(me));
+    }
+
+    @GetMapping("/rejected")
+    @Operation(summary = "내가 처리 가능한 인증 거절 목록 조회(관리자/크루오너)")
+    public ResponseEntity<List<VerificationImageResponse>> rejected(HttpServletRequest request) {
+        Long me = userService.getUserIdFromToken(request);
+        return ResponseEntity.ok(verificationImageService.getMyRejectedImages(me));
     }
 
     @PostMapping("/{imageId}/approve")
