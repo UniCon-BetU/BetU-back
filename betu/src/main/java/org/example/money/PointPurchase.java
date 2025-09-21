@@ -12,6 +12,11 @@ import org.example.user.User;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Table(name = "point_purchase",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_point_purchase_payment_key", columnNames = "payment_key"),
+                @UniqueConstraint(name = "uk_point_purchase_order_id",   columnNames = "order_id")
+        })
 public class PointPurchase {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
