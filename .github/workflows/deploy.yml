@@ -46,7 +46,7 @@ jobs:
 
           echo "openai.api-key=${{ secrets.OPENAI_API_KEY }}" >> betu/src/main/resources/application.properties
           echo "openai.model=${{ secrets.OPENAI_MODEL }}" >> betu/src/main/resources/application.properties
-          echo "openai.timeout-ms=1000" >> betu/src/main/resources/application.properties
+          echo "openai.timeout-ms=10000" >> betu/src/main/resources/application.properties
 
           echo "redisson.address=${{ secrets.REDISSON_ADDRESS }}" >> betu/src/main/resources/application.properties
           echo "redisson.password=${{ secrets.REDISSON_PASSWORD }}" >> betu/src/main/resources/application.properties     
