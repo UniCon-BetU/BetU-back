@@ -23,27 +23,15 @@ public class UserController {
 
     private final UserService userService;
 
-    @Operation(summary = "회원가입 1단계")
+    @Operation(summary = "회원가입")
     @SecurityRequirement(name = "")
-    @PostMapping(value = "/signup/step1", consumes = "application/json")
-    public ResponseEntity<Void> signUpStep1(
-            @RequestBody UserSignUpStep1Request requestDto,
+    @PostMapping(value = "/signup", consumes = "application/json")
+    public ResponseEntity<Void> signUp(
+            @RequestBody UserSignUpRequest requestDto,
             HttpServletResponse response
     ) {
-        userService.signUpStep1(requestDto, response);
+        userService.signUp(requestDto, response);
         return ResponseEntity.status(HttpStatus.CREATED).build();
-    }
-
-    @Operation(summary = "회원가입 2단계")
-    @SecurityRequirement(name = "")
-    @PostMapping(value = "/signup/step2", consumes = "application/json")
-    public ResponseEntity<Void> completeSignUp(
-            HttpServletRequest request,
-            @RequestBody UserSignUpStep2Request requestDto
-    ) {
-        Long userId = userService.getUserIdFromToken(request);
-        userService.completeSignUp(userId, requestDto);
-        return ResponseEntity.ok().build();
     }
 
     @Operation(summary = "로그인")
