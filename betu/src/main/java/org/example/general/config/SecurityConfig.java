@@ -32,7 +32,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable()) // CSRF 비활성화 (API 테스트용)
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/", "/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui.html", "/swagger-resources/**", "/webjars/**", "/api/user/signup/step1", "/api/user/signup/step2", "/api/user/login", "/upload/glb"
+                        .requestMatchers("/", "/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui.html", "/swagger-resources/**", "/webjars/**", "/api/user/signup", "/api/user/login", "/upload/glb"
                         ).permitAll() // 스웨거 허용
                         .anyRequest().authenticated() // 나머지는 인증 필요
                 )
