@@ -7,11 +7,16 @@ import org.example.money.dto.PointChargeRequest;
 import org.example.money.dto.PointChargeResponse;
 import org.example.user.User;
 import org.example.user.UserRepository;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -22,20 +27,44 @@ public class PointService {
     private final TossPaymentsClient toss;
     private final UserRepository userRepository;
     private final PointPurchaseRepository pointPurchaseRepository;
+    private final RedissonClient redisson;
 
-    /** 토스 결제 승인 + 포인트 적립 (멱등/동시성 대응) */
+    /** 토스 결제 승인 + 포인트 적립 (멱등/동시성 대응 + Redis 분산 락) */
     public PointChargeResponse confirmAndCredit(Long userId, PointChargeRequest req) {
         validateRequest(req);
 
-        // 1) 트랜잭션 밖에서 승인 (네트워크 호출 중 DB 락 보유 방지)
+        // 1) 트랜잭션 밖에서 승인
         TossPaymentResponse res = confirmOutsideTx(req);
 
-        // 2) 응답 교차 검증 (위·변조/오용 방지)
+        // 2) 응답 교차 검증
         validateTossResponseMatchesRequest(req, res);
 
-        // 3) 트랜잭션 안에서 "유니크 제약 + 사용자 행 잠금"으로 동시성 제어
-        return creditTx(userId, res);
+        // 3) 분산 락으로 동일 결제 처리 직렬화 → 트랜잭션 내부 creditTx 호출
+        String lockKey = "lock:point:charge:paymentKey:" + res.getPaymentKey(); // 또는 orderId
+        RLock lock = redisson.getLock(lockKey);
+
+        boolean locked = false;
+        try {
+            // (waitTime=0.5초, leaseTime=3초 예시) — 트랜잭션+DB I/O 시간에 맞춰 조정
+            locked = lock.tryLock(500, 3000, TimeUnit.MILLISECONDS);
+            if (!locked) {
+                // 대기 시간 안에 못 얻으면 409 등으로 반환하거나 재시도 로직
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "동일 결제 처리 중입니다. 잠시 후 다시 시도해주세요.");
+            }
+            // 락 보유 중에 트랜잭션 실행
+            return creditTx(userId, res);
+
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "락 획득 중 인터럽트", ie);
+        } finally {
+            // 현재 스레드가 보유 중일 때만 안전하게 해제
+            if (locked && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
+
 
     private void validateRequest(PointChargeRequest req) {
         if (req.getAmount() == null || req.getAmount() <= 0) {
