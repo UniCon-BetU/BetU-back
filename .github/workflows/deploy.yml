@@ -44,10 +44,19 @@ jobs:
           echo "cloud.aws.credentials.access-key=${{ secrets.CLOUD_AWS_ACCESS_KEY }}" >> betu/src/main/resources/application.properties
           echo "cloud.aws.credentials.secret-key=${{ secrets.CLOUD_AWS_SECRET_KEY }}" >> betu/src/main/resources/application.properties
 
+
           echo "mail.host=${{ secrets.MAIL_HOST }}" >> betu/src/main/resources/application.properties
           echo "mail.port=${{ secrets.MAIL_PORT }}" >> betu/src/main/resources/application.properties
           echo "mail.username=${{ secrets.MAIL_USERNAME }}" >> betu/src/main/resources/application.properties
           echo "mail.password=${{ secrets.MAIL_PASSWORD }}" >> betu/src/main/resources/application.properties
+
+          echo "openai.api-key=${{ secrets.OPENAI_API_KEY }}" >> betu/src/main/resources/application.properties
+          echo "openai.model=${{ secrets.OPENAI_MODEL }}" >> betu/src/main/resources/application.properties
+          echo "openai.timeout-ms=10000" >> betu/src/main/resources/application.properties
+
+          echo "redisson.address=${{ secrets.REDISSON_ADDRESS }}" >> betu/src/main/resources/application.properties
+          echo "redisson.password=${{ secrets.REDISSON_PASSWORD }}" >> betu/src/main/resources/application.properties     
+
       # Gradle 빌드
       - name: Build with Gradle
         run: |
