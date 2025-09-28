@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -287,20 +288,31 @@ public class ChallengeService {
     }
 
     // 좋아요한 챌린지 조회
-    public List<ChallengeResponse> getLikedChallenges(Long userId) {
+    public List<ChallengeWithLikeResponse> getLikedChallenges(Long userId) {
         List<ChallengeLike> likes = challengeLikeRepository.findByUserId(userId);
         if (likes.isEmpty()) {
             return Collections.emptyList();
         }
 
+        // 좋아요한 챌린지 id 목록
         List<Long> challengeIds = likes.stream()
                 .map(ChallengeLike::getChallengeId)
-                .collect(Collectors.toList());
+                .toList();
 
+        // 필요한 연관(crew 등)까지 한 번에 조회 (N+1 방지)
         List<Challenge> challenges = challengeRepository.findAllWithCrewByIdIn(challengeIds);
 
-        return challenges.stream()
-                .map(this::toResponse)
+        // id -> Challenge 매핑
+        Map<Long, Challenge> challengeById = challenges.stream()
+                .collect(Collectors.toMap(Challenge::getChallengeId, Function.identity()));
+
+        // likes 순서를 보존해서 응답 생성 (모두 liked=true)
+        return likes.stream()
+                .map(like -> {
+                    Challenge c = challengeById.get(like.getChallengeId());
+                    return c == null ? null : toChallengeWithLikeResponse(c, true);
+                })
+                .filter(Objects::nonNull)
                 .toList();
     }
 
@@ -383,6 +395,28 @@ public class ChallengeService {
                 c.getChallengeLikeCnt(),
                 c.getChallengeParticipantCnt(),
                 thumbnailUrl
+        );
+    }
+
+    private ChallengeWithLikeResponse toChallengeWithLikeResponse(Challenge c, boolean liked) {
+        String thumbnailUrl = challengeImageRepository
+                .findTopByChallenge_ChallengeIdOrderBySortOrderAsc(c.getChallengeId())
+                .map(ChallengeImage::getImageUrl)
+                .orElse(null);
+        return new ChallengeWithLikeResponse(
+                c.getChallengeId(),
+                c.getChallengeScope(),
+                c.getCrew(),
+                c.getTags(),
+                c.getCustomTags(),
+                c.getChallengeType(),
+                c.getChallengeName(),
+                c.getChallengeDescription(),
+                c.getChallengeDuration(),
+                c.getChallengeLikeCnt(),
+                c.getChallengeParticipantCnt(),
+                thumbnailUrl,
+                liked
         );
     }
 
