@@ -91,7 +91,7 @@ public class ChallengeController {
 
     @GetMapping("/me/likes")
     @Operation(summary = "내가 좋아요한 챌린지 조회")
-    public ResponseEntity<List<ChallengeResponse>> getLikedChallenges(HttpServletRequest request) {
+    public ResponseEntity<List<ChallengeWithLikeResponse>> getLikedChallenges(HttpServletRequest request) {
         Long userId = userService.getUserIdFromToken(request);
         return ResponseEntity.ok(challengeService.getLikedChallenges(userId));
     }
