@@ -340,20 +340,51 @@ public class ChallengeService {
     }
 
     // 내 챌린지 조회
-    public List<ChallengeResponse> getMyChallenges(Long userId) {
+    public List<ChallengeDetailResponse> getMyChallenges(Long userId) {
+        // 1) 유저가 속한 챌린지들(UserChallenge) 가져오기
         List<UserChallenge> userChallenges = userChallengeRepository.findAllByUser_UserId(userId);
-        if (userChallenges.isEmpty()) {
-            return Collections.emptyList();
-        }
+        if (userChallenges.isEmpty()) return Collections.emptyList();
 
+        // challengeId 목록 & 진행률 맵
         List<Long> challengeIds = userChallenges.stream()
                 .map(uc -> uc.getChallenge().getChallengeId())
-                .collect(Collectors.toList());
+                .toList();
 
+        Map<Long, Integer> progressByChallengeId = userChallenges.stream()
+                .collect(Collectors.toMap(
+                        uc -> uc.getChallenge().getChallengeId(),
+                        UserChallenge::getProgressPercent,
+                        (a, b) -> a // 충돌 시 앞값
+                ));
+
+        // 2) 챌린지 본문 + 크루 한번에
         List<Challenge> challenges = challengeRepository.findAllWithCrewByIdIn(challengeIds);
 
+        // 3) 좋아요 여부 세트
+        Set<Long> likedChallengeIds = challengeLikeRepository.findByUserId(userId).stream()
+                .map(ChallengeLike::getChallengeId)
+                .collect(Collectors.toSet());
+
+        // 4) 오늘 인증 여부 맵(루프로 체크)
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
+        Map<Long, Boolean> todayVerifiedMap = new HashMap<>();
+        for (Long cid : challengeIds) {
+            boolean todayVerified = verificationImageRepository
+                    .existsByUserChallenge_User_UserIdAndUserChallenge_Challenge_ChallengeIdAndUploadedAtBetween(
+                            userId, cid, startOfDay, endOfDay);
+            todayVerifiedMap.put(cid, todayVerified);
+        }
+
+        // 5) 상세 응답으로 매핑
         return challenges.stream()
-                .map(this::toResponse)
+                .map(c -> {
+                    boolean isParticipating = true; // 내 챌린지 목록이므로 항상 true
+                    int progress = progressByChallengeId.getOrDefault(c.getChallengeId(), 0);
+                    boolean liked = likedChallengeIds.contains(c.getChallengeId());
+                    boolean todayVerified = todayVerifiedMap.getOrDefault(c.getChallengeId(), false);
+                    return toDetailResponse(c, isParticipating, progress, liked, todayVerified);
+                })
                 .toList();
     }
 
