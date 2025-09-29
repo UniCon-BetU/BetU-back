@@ -98,7 +98,7 @@ public class ChallengeController {
 
     @GetMapping("/me")
     @Operation(summary = "내가 참여한 챌린지 조회")
-    public ResponseEntity<List<ChallengeResponse>> getMyChallenges(HttpServletRequest request) {
+    public ResponseEntity<List<ChallengeDetailResponse>> getMyChallenges(HttpServletRequest request) {
         Long userId = userService.getUserIdFromToken(request);
         return ResponseEntity.ok(challengeService.getMyChallenges(userId));
     }
